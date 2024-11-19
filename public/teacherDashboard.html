@@ -13,7 +13,7 @@
 </div>
 
 <div class="container">
-    <h3>Καλώς ήρθατε στον Πίνακα Ελέγχου</h3>
+    <h3>Καλώς ήρθατε στον Πίνακα Ελέγχου, <span id="username"></span>!</h3>
     <div class="menu">
         <button onclick="showSection('create-thesis')">Προβολή και Δημιουργία Θεμάτων</button>
         <button onclick="showSection('assign-thesis')">Ανάθεση Θέματος σε Φοιτητή</button>
@@ -43,8 +43,8 @@
             <label>Αναζήτηση Φοιτητή (με ΑΜ ή ονοματεπώνυμο):</label>
             <input type="text" name="student_search" required>
             <label>Επιλογή Θέματος:</label>
-            <select name="thesis_selection" required>
-                <!-- AJAX φόρτωση επιλογών θεμάτων από βάση δεδομένων -->
+            <select name="thesis_selection" id="thesis_selection" required>
+                <!-- Dynamically loaded options -->
             </select>
             <button type="submit">Ανάθεση Θέματος</button>
         </form>
@@ -71,7 +71,7 @@
                 </tr>
             </thead>
             <tbody>
-                <!-- Δεδομένα από AJAX -->
+                <!-- Dynamically populated via JavaScript -->
             </tbody>
         </table>
     </div>
@@ -87,7 +87,7 @@
                 </tr>
             </thead>
             <tbody>
-                <!-- Δεδομένα από AJAX -->
+                <!-- Dynamically populated via JavaScript -->
             </tbody>
         </table>
     </div>
@@ -96,11 +96,38 @@
     <div id="statistics" class="section">
         <h3>Στατιστικά Διπλωματικών</h3>
         <div id="chartContainer">
-            <!-- Chart.js θα εμφανίσει στατιστικά -->
+            <!-- Chart.js will be used here -->
         </div>
     </div>
 </div>
 
 <script src="script.js"></script>
+<script>
+    // Simulate user data from the backend (This should be fetched dynamically)
+    const user = {
+        username: "Teacher123",
+        role: "teacher"
+    };
+
+    // Populate username dynamically
+    document.getElementById("username").innerText = user.username;
+
+    // Logout function
+    function logout() {
+        fetch('/logout', {
+            method: 'GET'
+        }).then(() => {
+            window.location.href = '/login';
+        });
+    }
+
+    // Section navigation
+    function showSection(sectionId) {
+        document.querySelectorAll('.section').forEach(section => {
+            section.style.display = 'none';
+        });
+        document.getElementById(sectionId).style.display = 'block';
+    }
+</script>
 </body>
 </html>
