@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <title>Student — Thesis System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h1>Πίνακας Φοιτητή</h1>
+      <button id="logoutBtn">Logout</button>
+    </div>
+    <p id="welcome"></p>
+  </div>
+
+  <div class="card">
+    <h2>Η Διπλωματική μου</h2>
+    <pre id="thesisBox">Φόρτωση...</pre>
+  </div>
+
+  <div class="card">
+    <h2>Στοιχεία Επικοινωνίας</h2>
+    <div class="grid">
+      <input id="addr" placeholder="Διεύθυνση">
+      <input id="em" placeholder="Email επικοινωνίας">
+      <input id="mob" placeholder="Κινητό">
+      <input id="land" placeholder="Σταθερό">
+      <button id="saveProfile">Αποθήκευση</button>
+    </div>
+  </div>
+</div>
+<script src="/js/student.js"></script>
+</body>
+</html>

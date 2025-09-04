@@ -1,119 +1,65 @@
+const path = require('path');
 const express = require('express');
+const bodyParser = require('body-parser');
 const session = require('express-session');
-const bcrypt = require('bcrypt'); // For password hashing (if you want to use it later)
-const mysql = require('mysql2'); // For database connection
-const path = require('path'); // For serving static files
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+require('dotenv').config();
+
+const { ensureAuth, requireRole } = require('./src/middleware/auth');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(express.json()); // For parsing JSON
-app.use(express.urlencoded({ extended: true })); // For parsing form data
-app.use(express.static(path.join(__dirname, 'public'))); // Serve static files
+// security & utils
+app.use(helmet());
+app.use(morgan('dev'));
+app.use(cors({ origin: true, credentials: true }));
+app.use(bodyParser.json());
 
-// Session Configuration
+// sessions
 app.use(session({
-    secret: 'your-secret-key', // Replace with a secure secret
-    resave: false,
-    saveUninitialized: true,
+  secret: process.env.SESSION_SECRET || 'dev-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false, httpOnly: true } // secure: true σε HTTPS
 }));
 
-// Mock User Data (Temporary)
-const users = [
-    { username: 'teacher1', password: '12345', role: 'teacher' },
-    { username: 'student1', password: '12345', role: 'student' },
-];
+// static
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Database Connection (if needed in the future)
-const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: 'password', // Replace with your DB password
-    database: 'web_app',  // Replace with your DB name
+// rate-limit μόνο στο login
+const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
+app.use('/api/auth/login', loginLimiter);
+
+// routes
+app.use('/api/auth', require('./src/routes/auth'));
+app.use('/api/teacher', require('./src/routes/teacher'));
+app.use('/api/student', require('./src/routes/student'));
+app.use('/api/secretariat', require('./src/routes/secretariat'));
+app.use('/feed', require('./src/routes/feed')); // δημόσιο
+
+// protected HTML pages
+app.get('/teacher.html', ensureAuth, requireRole('teacher','admin'), (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'teacher.html'));
+});
+app.get('/student.html', ensureAuth, requireRole('student','admin'), (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'student.html'));
+});
+app.get('/secretary.html', ensureAuth, requireRole('secretariat','admin'), (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'secretary.html'));
 });
 
-db.connect(err => {
-    if (err) {
-        console.error('Database connection failed:', err);
-    } else {
-        console.log('Connected to database.');
-    }
-});
+// default → login
+app.get('/', (_, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 
-// Middleware to Protect Routes
-function checkAuth(role) {
-    return (req, res, next) => {
-        if (!req.session.user || req.session.user.role !== role) {
-            return res.redirect('/login');
-        }
-        next();
-    };
-}
+// health
+app.get('/api/health', (_, res) => res.json({ ok: true }));
 
-// Routes
+// 404
+app.use((req, res) => res.status(404).json({ message: 'Not found' }));
 
-// Root Redirect to Login
-app.get('/', (req, res) => {
-    res.redirect('/login');
-});
-
-// Serve Login Page
-app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
-});
-
-// Handle Login Form Submission
-app.post('/login', (req, res) => {
-    const { username, password } = req.body;
-
-    // Check mock user credentials
-    const user = users.find(u => u.username === username && u.password === password);
-
-    if (user) {
-        // Save user session
-        req.session.user = {
-            username: user.username,
-            role: user.role,
-        };
-
-        // Redirect based on role
-        if (user.role === 'teacher') {
-            return res.redirect('/dashboard/teacher');
-        } else if (user.role === 'student') {
-            return res.redirect('/dashboard/student');
-        } else {
-            return res.status(403).send('Access denied.');
-        }
-    } else {
-        return res.status(401).send('Invalid username or password.');
-    }
-});
-
-// Logout Route
-app.get('/logout', (req, res) => {
-    req.session.destroy(err => {
-        if (err) return res.status(500).send('Could not log out.');
-        res.redirect('/login');
-    });
-});
-
-// Serve Teacher Dashboard
-app.get('/dashboard/teacher', checkAuth('teacher'), (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'TeacherDashboard.html'));
-});
-
-// Serve Student Dashboard
-app.get('/dashboard/student', checkAuth('student'), (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'StudentDashboard.html'));
-});
-
-// Serve Admin Dashboard (if applicable)
-app.get('/dashboard/admin', checkAuth('admin'), (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'AdminDashboard.html'));
-});
-
-// Start Server
-const PORT = 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running at http://localhost:${PORT}`);
-});
+// start
+app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <title>Teacher — Thesis System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h1>Πίνακας Διδάσκοντα</h1>
+      <button id="logoutBtn">Logout</button>
+    </div>
+    <p id="welcome"></p>
+  </div>
+
+  <div class="grid grid2">
+    <div class="card">
+      <h2>Νέο Θέμα</h2>
+      <label>Τίτλος <input id="t_title"></label>
+      <label>Περιγραφή <textarea id="t_desc"></textarea></label>
+      <button id="createTopicBtn">Αποθήκευση</button>
+    </div>
+
+    <div class="card">
+      <h2>Ανάθεση Θέματος</h2>
+      <label>ID Θέματος <input id="a_topic"></label>
+      <label>ID Φοιτητή <input id="a_student"></label>
+      <button id="assignBtn">Ανάθεση</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Τα Θέματά μου</h2>
+    <table class="table"><thead><tr><th>ID</th><th>Τίτλος</th><th>Δημιουργήθηκε</th></tr></thead>
+      <tbody id="topicsTbody"></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Αναθέσεις</h2>
+    <table class="table"><thead><tr><th>ID</th><th>Φοιτητής</th><th>Θέμα</th><th>Κατάσταση</th></tr></thead>
+      <tbody id="assignmentsTbody"></tbody></table>
+    <p><a id="exportJson" href="#">Export JSON</a> • <a id="exportCsv" href="#">Export CSV</a></p>
+  </div>
+
+  <div class="card">
+    <h2>Προσκλήσεις Τριμελούς</h2>
+    <table class="table"><thead><tr><th>ID</th><th>Θέμα</th><th>Κατάσταση</th><th>Ενέργεια</th></tr></thead>
+      <tbody id="invTbody"></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Στατιστικά</h2>
+    <canvas id="statsChart"></canvas>
+  </div>
+</div>
+<script src="/js/teacher.js"></script>
+</body>
+</html>
