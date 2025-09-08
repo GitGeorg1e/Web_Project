@@ -1,22 +1,33 @@
 // src/controllers/teacherController.js
 const { pool } = require('../config/db');
+const path = require('path');
+const fs = require('fs');
 
 async function listTopics(req, res) {
   const teacherId = req.session.user.id;
-  const [rows] = await pool.query('SELECT * FROM topics WHERE created_by=? ORDER BY created_at DESC', [teacherId]);
+  const [rows] = await pool.query('SELECT id, title, description, pdf_path, created_at FROM topics WHERE created_by=? ORDER BY created_at DESC', [teacherId]);
   res.json(rows);
 }
 
 async function createTopic(req, res) {
-  const teacherId = req.session.user.id;
-  const { title, description, pdf_path } = req.body;
-  if (!title) return res.status(400).json({ message: 'Title required' });
-  const [r] = await pool.query(
-    'INSERT INTO topics (title, description, pdf_path, created_by) VALUES (?,?,?,?)',
-    [title, description || null, pdf_path || null, teacherId]
-  );
-  res.json({ ok: true, id: r.insertId });
+  try {
+    const teacherId = req.session.user.id;
+    const { title, description } = req.body || {};
+    if (!title) return res.status(400).json({ message: 'Title required' });
+
+    const pdf_path = req.file ? `/uploads/topic_pdfs/${req.file.filename}` : null;
+
+    const [r] = await pool.query(
+      'INSERT INTO topics (title, description, pdf_path, created_by) VALUES (?,?,?,?)',
+      [title, description || null, pdf_path, teacherId]
+    );
+    res.status(201).json({ ok: true, id: r.insertId, pdf_path });
+  } catch (e) {
+    console.error(e); res.status(500).json({ message: 'Σφάλμα διακομιστή' });
+  }
 }
+
+
 
 async function assignTopic(req, res) {
   const supervisorId = req.session.user.id;
@@ -28,6 +39,46 @@ async function assignTopic(req, res) {
   );
   res.json({ ok: true, id: r.insertId });
 }
+
+async function updateTopic(req, res) {
+  try {
+    const teacherId = req.session.user.id;
+    const { id } = req.params;
+    const { title, description } = req.body || {};
+
+    const [[topic]] = await pool.query('SELECT id, created_by, pdf_path FROM topics WHERE id=?', [id]);
+    if (!topic) return res.status(404).json({ message: 'Topic not found' });
+    if (topic.created_by !== teacherId) return res.status(403).json({ message: 'Forbidden' });
+
+    let newPdfPath = topic.pdf_path;
+    if (req.file) {
+      newPdfPath = `/uploads/topic_pdfs/${req.file.filename}`;
+      if (topic.pdf_path && topic.pdf_path.startsWith('/uploads/')) {
+        const abs = path.join(__dirname, '..', '..', topic.pdf_path);
+        fs.unlink(abs, () => {});
+      }
+    }
+
+    const fields = [];
+    const params = [];
+    if (title !== undefined) { fields.push('title=?'); params.push(title); }
+    if (description !== undefined) { fields.push('description=?'); params.push(description); }
+    if (req.file) { fields.push('pdf_path=?'); params.push(newPdfPath); }
+
+    if (!fields.length) return res.json({ ok: true, id });
+
+    params.push(id, teacherId);
+    const sql = `UPDATE topics SET ${fields.join(', ')} WHERE id=? AND created_by=?`;
+    const [r] = await pool.query(sql, params);
+    if (!r.affectedRows) return res.status(400).json({ message: 'Δεν ενημερώθηκε' });
+
+    res.json({ ok: true, id, pdf_path: newPdfPath });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: 'Σφάλμα διακομιστή' });
+  }
+}
+
 
 async function listAssignments(req, res) {
   const supervisorId = req.session.user.id;
@@ -48,10 +99,11 @@ async function listAssignments(req, res) {
 async function listInvitations(req, res) {
   const teacherId = req.session.user.id;
   const [rows] = await pool.query(`
-    SELECT i.id, t.title, i.status, i.invited_at, i.responded_at
+    SELECT i.id, i.assignment_id, t.title, u.username AS student, i.status, i.invited_at, i.responded_at
     FROM invitations i
     JOIN assignments a ON i.assignment_id=a.id
     JOIN topics t ON a.topic_id=t.id
+    JOIN users  u      ON a.student_id=u.id 
     WHERE i.invitee_id=?
     ORDER BY i.invited_at DESC
   `, [teacherId]);
@@ -66,6 +118,7 @@ async function respondInvitation(req, res) {
     'UPDATE invitations SET status=?, responded_at=NOW() WHERE id=? AND invitee_id=?',
     [status, invitation_id, teacherId]
   );
+   if (!r.affectedRows) return res.status(400).json({ message: 'Δεν ενημερώθηκε' });
   res.json({ ok: true });
 }
 
@@ -108,8 +161,53 @@ async function exportTheses(req, res) {
   res.json(rows);
 }
 
+// --- under_assignment -> active
+async function confirmAssignment(req, res) {
+  try {
+    const supervisorId = req.session.user.id;
+    const { id } = req.params;
+
+    const [r] = await pool.query(
+      'UPDATE assignments SET status="active" WHERE id=? AND supervisor_id=? AND status="under_assignment"',
+      [id, supervisorId]
+    );
+
+    if (!r.affectedRows) {
+      return res.status(400).json({ message: 'Δεν μπορεί να οριστικοποιηθεί (λάθος κατάσταση ή δεν είστε ο επιβλέπων)' });
+    }
+    res.json({ ok: true, status: 'active' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Σφάλμα διακομιστή' });
+  }
+}
+
+// --- active -> under_review
+async function requestReview(req, res) {
+  try {
+    const supervisorId = req.session.user.id;
+    const { id } = req.params;
+
+    const [r] = await pool.query(
+      'UPDATE assignments SET status="under_review" WHERE id=? AND supervisor_id=? AND status="active"',
+      [id, supervisorId]
+    );
+
+    if (!r.affectedRows) {
+      return res.status(400).json({ message: 'Δεν μπορεί να σταλεί για εξέταση (λάθος κατάσταση ή δεν είστε ο επιβλέπων)' });
+    }
+    res.json({ ok: true, status: 'under_review' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Σφάλμα διακομιστή' });
+  }
+}
+
+
+
+
 module.exports = {
-  listTopics, createTopic, assignTopic, listAssignments,
-  listInvitations, respondInvitation, stats, exportTheses
+  listTopics, createTopic, assignTopic, updateTopic, listAssignments,
+  listInvitations, respondInvitation, stats, exportTheses, confirmAssignment, requestReview
   
 };

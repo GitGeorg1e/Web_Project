@@ -17,7 +17,10 @@ const PORT = process.env.PORT || 3000;
 app.use(helmet());
 app.use(morgan('dev'));
 app.use(cors({ origin: true, credentials: true }));
-app.use(bodyParser.json());
+//app.use(bodyParser.json());
+app.use(express.json());
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // sessions
 app.use(session({
@@ -59,7 +62,13 @@ app.get('/', (_, res) => res.sendFile(path.join(__dirname, 'public', 'login.html
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 
 // 404
-app.use((req, res) => res.status(404).json({ message: 'Not found' }));
+app.use((req, res) => {
+  // αν θες: για /api/* δώσε 404 JSON, για HTML δώσε redirect
+  if (req.originalUrl.startsWith('/api/')) {
+    return res.status(404).json({ message: 'Not found' });
+  }
+  res.redirect('/');
+});
 
 // start
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
