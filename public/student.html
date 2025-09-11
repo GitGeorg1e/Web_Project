@@ -1,37 +1,122 @@
 <!doctype html>
 <html lang="el">
 <head>
-  <meta charset="utf-8">
-  <title>Student — Thesis System</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/styles.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Φοιτητής — Διπλωματική</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .card { border:1px solid #eee; border-radius:8px; padding:12px; margin:12px 0; }
+    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    label { display:block; font-weight:600; margin-top:8px; }
+    input, textarea, select, button { padding:8px; }
+    small { color:#666; }
+    ul { list-style: none; padding:0; }
+    li { padding:6px 0; border-bottom:1px solid #f0f0f0; }
+  </style>
 </head>
 <body>
-<div class="container">
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <h1>Πίνακας Φοιτητή</h1>
-      <button id="logoutBtn">Logout</button>
-    </div>
-    <p id="welcome"></p>
+  <div class="container">
+    <header class="row">
+      <h1 style="margin:0">Πίνακας Φοιτητή</h1>
+      <button id="logout">Αποσύνδεση</button>
+    </header>
+
+    <!-- ΔΙΠΛΩΜΑΤΙΚΗ -->
+    <section class="card">
+      <h2>Η διπλωματική μου</h2>
+      <div id="thesis">Φόρτωση...</div>
+    </section>
+
+
+    <section>
+  <h2>Το Προφίλ μου</h2>
+  <form id="profile-form">
+    <label>
+      Διεύθυνση:
+      <input type="text" id="address" name="address" />
+    </label>
+    <label>
+      Email επικοινωνίας:
+      <input type="email" id="email_contact" name="email_contact" />
+    </label>
+    <label>
+      Κινητό τηλέφωνο:
+      <input type="text" id="phone_mobile" name="phone_mobile" />
+    </label>
+    <label>
+      Σταθερό τηλέφωνο:
+      <input type="text" id="phone_landline" name="phone_landline" />
+    </label>
+    <button type="submit">Αποθήκευση</button>
+    <p id="profile-msg"></p>
+  </form>
+</section>
+
+
+
+    <!-- ΤΡΙΜΕΛΗΣ -->
+    <section class="card">
+      <h2>Τριμελής Επιτροπή</h2>
+      <div class="row">
+        <input id="invite-assignment-id" placeholder="assignment_id" />
+        <input id="invite-teacher-id" placeholder="invitee_id (teacher id)" />
+        <button id="btn-invite">Πρόσκληση</button>
+      </div>
+      <small>Σημ.: προσωρινά δίνεις χειροκίνητα τα IDs. Μπορούμε να βάλουμε λίστα καθηγητών αργότερα.</small>
+      <ul id="committee-list" style="margin-top:10px;"></ul>
+    </section>
+
+    <!-- DRAFT & LINKS -->
+    <section class="card">
+      <h2>Πρόχειρο & Links</h2>
+      <div class="row"><input id="draft-assignment-id" placeholder="assignment_id" /></div>
+      <label>Draft URL (pdf/drive):</label>
+      <input id="draft-url" placeholder="https://..." />
+      <label>Extra Links (ένα ανά γραμμή):</label>
+      <textarea id="links" rows="3" placeholder="https://...\nhttps://..."></textarea>
+      <button id="btn-draft">Αποθήκευση Draft/Links</button>
+    </section>
+
+    <!-- ΕΞΕΤΑΣΗ -->
+    <section class="card">
+      <h2>Στοιχεία Εξέτασης</h2>
+      <div class="row"><input id="exam-assignment-id" placeholder="assignment_id" /></div>
+      <label>Ημερομηνία-Ώρα (YYYY-MM-DD HH:MM:SS):</label>
+      <input id="exam-datetime" placeholder="2025-10-15 12:00:00" />
+      <label>Τρόπος:</label>
+      <select id="exam-mode">
+        <option value="">—</option>
+        <option value="in_person">Δια ζώσης</option>
+        <option value="online">Online</option>
+      </select>
+      <label>Αίθουσα (αν δια ζώσης):</label>
+      <input id="exam-room" placeholder="Room B1" />
+      <label>Σύνδεσμος (αν online):</label>
+      <input id="meeting-url" placeholder="https://..." />
+      <button id="btn-exam">Αποθήκευση Εξέτασης</button>
+    </section>
+
+    <!-- REPOSITORY -->
+    <section class="card">
+      <h2>Τελικό Αποθετήριο (Νημερτής)</h2>
+      <div class="row"><input id="repo-assignment-id" placeholder="assignment_id" /></div>
+      <input id="repo-url" placeholder="https://nimertis..." style="width:100%" />
+      <button id="btn-repo">Αποθήκευση</button>
+    </section>
+
+    <!-- ΠΡΑΚΤΙΚΟ -->
+    <section class="card">
+      <h2>Πρακτικό Εξέτασης</h2>
+      <div class="row">
+        <input id="report-assignment-id" placeholder="assignment_id" />
+        <button id="btn-report">Άνοιγμα πρακτικού</button>
+      </div>
+    </section>
   </div>
 
-  <div class="card">
-    <h2>Η Διπλωματική μου</h2>
-    <pre id="thesisBox">Φόρτωση...</pre>
-  </div>
+  <script src="/js/student.js" defer></script>
 
-  <div class="card">
-    <h2>Στοιχεία Επικοινωνίας</h2>
-    <div class="grid">
-      <input id="addr" placeholder="Διεύθυνση">
-      <input id="em" placeholder="Email επικοινωνίας">
-      <input id="mob" placeholder="Κινητό">
-      <input id="land" placeholder="Σταθερό">
-      <button id="saveProfile">Αποθήκευση</button>
-    </div>
-  </div>
-</div>
-<script src="/js/student.js"></script>
 </body>
 </html>
+

@@ -1,7 +1,10 @@
 const router = require('express').Router();
-const { listTopics, createTopic, assignTopic, updateTopic, listAssignments, listInvitations, respondInvitation, stats, exportTheses, confirmAssignment, requestReview } = require('../controllers/teacherController');
+const { listTopics, createTopic, assignTopic, updateTopic, listAssignments, listInvitations, respondInvitation, stats, exportTheses, confirmAssignment, requestReview, cancelAssignment, listMyTheses } = require('../controllers/teacherController');
 const { ensureAuth, requireRole } = require('../middleware/auth');
 const { uploadTopicPdf } = require('../middleware/upload');
+
+
+
 
 router.use(ensureAuth, requireRole('teacher','admin'));
 router.get('/topics', listTopics);
@@ -23,5 +26,8 @@ router.post('/invitations/respond', respondInvitation);
 router.get('/stats', stats);
 router.get('/theses/export', exportTheses);
 router.get('/ping', (req,res)=>res.json({ok:true, route:'teacher'}));
+router.post('/assignments/:id/cancel', cancelAssignment);
+router.get('/my-theses', listMyTheses);
+
 
 module.exports = router;

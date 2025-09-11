@@ -1,9 +1,16 @@
 // src/middleware/auth.js
 function ensureAuth(req, res, next) {
   if (req.session?.user) return next();
-  if (req.accepts(['html','json']) === 'html') return res.redirect('/');
-  return res.status(401).json({ message: 'Unauthorized' });
+
+  // Για API: πάντα JSON 401
+  if (req.originalUrl.startsWith('/api/')) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  // Για σελίδες (HTML) μόνο: redirect
+  return res.redirect('/');
 }
+
 
 function requireRole(...allowed) {
   return (req, res, next) => {

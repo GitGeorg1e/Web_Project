@@ -33,6 +33,8 @@ app.use(session({
 // static
 app.use(express.static(path.join(__dirname, 'public')));
 
+
+
 // rate-limit μόνο στο login
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 app.use('/api/auth/login', loginLimiter);

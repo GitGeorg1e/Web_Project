@@ -183,6 +183,36 @@ async function loadAssignments(){
   });
 }
 
+//cancel assignment
+
+document.getElementById('btn-cancel-assignment')?.addEventListener('click', async () => {
+  const id = Number(document.getElementById('cancel-assignment-id').value.trim());
+  const reason = document.getElementById('cancel-reason').value.trim();
+  const msg = document.getElementById('cancel-msg');
+  msg.textContent = '';
+
+  if (!id) { msg.textContent = 'Δώσε assignment_id'; return; }
+  if (!confirm('Σίγουρα ακύρωση ανάθεσης;')) return;
+
+  try {
+    const res = await fetch(`/api/teacher/assignments/${id}/cancel`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type':'application/json','Accept': 'application/json' },
+      body: JSON.stringify({ reason })
+    });
+    const data = await res.json();
+    if (!res.ok) throw (data || { message: res.statusText });
+    msg.textContent = '✅ Ακυρώθηκε.';
+    // Προαιρετικά: ανανέωσε λίστα αναθέσεων
+    // loadAssignments();
+  } catch (e) {
+    msg.textContent = `❌ ${e.message || 'Σφάλμα'}`;
+  }
+});
+
+
+
 // --- invitations (accept/reject χωρίς innerHTML) ---
 async function loadInvitations(){
   const rows = await api('/api/teacher/invitations');
