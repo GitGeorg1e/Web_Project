@@ -1,30 +1,79 @@
-// --- helpers ---
-async function api(url, opts = {}) {
-  const r = await fetch(url, { credentials: 'same-origin', ...opts });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.message || r.statusText || 'Request failed');
-  return data;
-}
-function esc(s) { return String(s ?? ''); }
-function $(id) { return document.getElementById(id); }
-function clear(node) { while (node && node.firstChild) node.removeChild(node.firstChild); }
-function td(text) { const x=document.createElement('td'); x.textContent=text; return x; }
-function makeBtn(label, onClick) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.textContent = label;
-  b.style.marginRight = '8px';
-  b.addEventListener('click', onClick);
+// ================== helpers ==================
+function $(id){ return document.getElementById(id); }
+function td(text){ const x=document.createElement('td'); x.textContent=text; return x; }
+function clear(node){ while(node && node.firstChild) node.removeChild(node.firstChild); }
+function esc(s){ return String(s ?? ''); }
+
+function makeBtn(label, variant='primary'){
+  const b=document.createElement('button');
+  b.type='button';
+  b.textContent=label;
+  if(variant==='secondary') b.className='secondary';
   return b;
 }
 
-// --- me/welcome ---
+function setLoading(btn, on){
+  if(!btn) return;
+  btn.disabled = !!on;
+  if(on){
+    btn.dataset.prev = btn.textContent;
+    btn.textContent = 'Παρακαλώ…';
+  }else{
+    btn.textContent = btn.dataset.prev || btn.textContent;
+  }
+}
+
+function toast(msg, type='success'){
+  const wrap = document.querySelector('.toast-wrap') || (()=>{ const w=document.createElement('div'); w.className='toast-wrap'; document.body.appendChild(w); return w; })();
+  const t = document.createElement('div');
+  t.className = 'toast ' + (type==='error' ? 'error' : 'success');
+  t.textContent = msg;
+  wrap.appendChild(t);
+  setTimeout(()=> t.remove(), 2600);
+}
+
+async function api(url, opts = {}){
+  const r = await fetch(url, { credentials: 'same-origin', ...opts });
+  const data = await r.json().catch(()=> ({}));
+  if(!r.ok){
+    const msg = data.message || r.statusText || 'Request failed';
+    toast(msg, 'error');
+    throw new Error(msg);
+  }
+  return data;
+}
+
+// ================== session / welcome / logout ==================
 async function loadMe(){
   const { user } = await api('/api/auth/me');
   $('welcome').textContent = `Καλώς ήρθες, ${user.full_name || user.username} (${user.role})`;
 }
+$('logoutBtn')?.addEventListener('click', async ()=>{
+  await api('/api/auth/logout', { method:'POST' });
+  location.href = '/';
+});
 
-// ========= Topics =========
+// ================== FilePond (PDF uploader) ==================
+let pond = null;
+function initFilePond(){
+  if(!window.FilePond) return;
+  if(window.FilePondPluginFileValidateType) FilePond.registerPlugin(FilePondPluginFileValidateType);
+  if(window.FilePondPluginFileValidateSize) FilePond.registerPlugin(FilePondPluginFileValidateSize);
+
+  const input = $('t_pdf');
+  if(!input) return;
+
+  pond = FilePond.create(input, {
+    allowMultiple:false,
+    instantUpload:false,
+    acceptedFileTypes:['application/pdf'],
+    fileValidateTypeLabelExpectedTypes:'Μόνο αρχεία PDF',
+    maxFileSize:'10MB',
+    labelIdle:'Σύρε εδώ ένα <span class="filepond--label-action">PDF</span> ή κάνε κλικ'
+  });
+}
+
+// ================== Topics ==================
 let editingTopicId = null;
 
 async function loadTopics(){
@@ -38,107 +87,82 @@ async function loadTopics(){
     tr.appendChild(td(r.title));
 
     const cPdf = document.createElement('td');
-    if (r.pdf_path) {
-      const a = document.createElement('a');
-      a.href = r.pdf_path; a.textContent = 'Άνοιγμα PDF';
-      a.target = '_blank'; a.rel = 'noopener';
+    if(r.pdf_path){
+      const a=document.createElement('a');
+      a.href=r.pdf_path; a.textContent='Άνοιγμα PDF';
+      a.target='_blank'; a.rel='noopener';
       cPdf.appendChild(a);
-    } else {
-      cPdf.textContent = '—';
+    }else{
+      cPdf.textContent='—';
     }
     tr.appendChild(cPdf);
 
     tr.appendChild(td(new Date(r.created_at).toLocaleString()));
 
-    const act = document.createElement('td');
-    const editBtn = makeBtn('Επεξεργασία', ()=>{
+    const act = document.createElement('td'); act.className='text-right';
+    const editBtn = makeBtn('Επεξεργασία', 'secondary');
+    editBtn.addEventListener('click', ()=>{
       editingTopicId = r.id;
       $('t_title').value = r.title || '';
       $('t_desc').value  = r.description || '';
-      if (pond) pond.removeFiles(); else $('t_pdf').value = '';
+      if(pond) pond.removeFiles(); else $('t_pdf').value = '';
       $('topicFormHint').textContent = `Λειτουργία: Επεξεργασία (#${r.id})`;
     });
     act.appendChild(editBtn);
-    tr.appendChild(act);
 
+    tr.appendChild(act);
     tb.appendChild(tr);
   });
 }
 
-$('cancelEditBtn').onclick = ()=>{
+$('cancelEditBtn')?.addEventListener('click', ()=>{
   editingTopicId = null;
   $('t_title').value = '';
   $('t_desc').value  = '';
-  if (pond) pond.removeFiles(); else $('t_pdf').value = '';
+  if(pond) pond.removeFiles(); else $('t_pdf').value = '';
   $('topicFormHint').textContent = 'Λειτουργία: Δημιουργία';
-};
+});
 
-$('createTopicBtn').onclick = async ()=>{
+$('createTopicBtn')?.addEventListener('click', async (e)=>{
+  const btn = e.currentTarget;
   const title = $('t_title').value.trim();
   const description = $('t_desc').value.trim();
-  const fallbackInput = $('t_pdf');
-  if (!title) return alert('Τίτλος υποχρεωτικός');
+  const fallback = $('t_pdf');
+  if(!title) return alert('Τίτλος υποχρεωτικός');
 
   const fd = new FormData();
   fd.append('title', title);
   fd.append('description', description);
 
   const fileFromPond = pond && pond.getFiles && pond.getFiles()[0]?.file;
-  const file = fileFromPond || (fallbackInput.files && fallbackInput.files[0]) || null;
-  if (file) fd.append('pdf', file);
+  const file = fileFromPond || (fallback.files && fallback.files[0]) || null;
+  if(file) fd.append('pdf', file);
 
-  try {
-    if (editingTopicId) {
-      const r = await fetch(`/api/teacher/topics/${editingTopicId}`, {
-        method: 'PUT',
-        credentials: 'same-origin',
-        body: fd
-      });
+  try{
+    setLoading(btn, true);
+    if(editingTopicId){
+      const r = await fetch(`/api/teacher/topics/${editingTopicId}`, { method:'PUT', credentials:'same-origin', body:fd });
       const data = await r.json().catch(()=> ({}));
-      if (!r.ok) throw new Error(data.message || 'Update failed');
-    } else {
-      const r = await fetch('/api/teacher/topics', {
-        method: 'POST',
-        credentials: 'same-origin',
-        body: fd
-      });
+      if(!r.ok) throw new Error(data.message || 'Update failed');
+      toast('Το θέμα ενημερώθηκε');
+    }else{
+      const r = await fetch('/api/teacher/topics', { method:'POST', credentials:'same-origin', body:fd });
       const data = await r.json().catch(()=> ({}));
-      if (!r.ok) throw new Error(data.message || 'Create failed');
+      if(!r.ok) throw new Error(data.message || 'Create failed');
+      toast('Το θέμα δημιουργήθηκε');
     }
 
     editingTopicId = null;
     $('t_title').value = '';
     $('t_desc').value  = '';
-    if (pond) pond.removeFiles(); else $('t_pdf').value = '';
+    if(pond) pond.removeFiles(); else $('t_pdf').value = '';
     $('topicFormHint').textContent = 'Λειτουργία: Δημιουργία';
-
     await loadTopics();
-  } catch (e) {
-    alert(e.message);
-  }
-};
+  }catch(_e){ /* toast already shown */ }
+  finally{ setLoading(btn, false); }
+});
 
-// ========= FilePond (PDF uploader) =========
-let pond = null;
-function initFilePond() {
-  if (!window.FilePond) return;
-  if (window.FilePondPluginFileValidateType) FilePond.registerPlugin(FilePondPluginFileValidateType);
-  if (window.FilePondPluginFileValidateSize) FilePond.registerPlugin(FilePondPluginFileValidateSize);
-
-  const input = $('t_pdf');
-  if (!input) return;
-
-  pond = FilePond.create(input, {
-    allowMultiple: false,
-    instantUpload: false,
-    acceptedFileTypes: ['application/pdf'],
-    fileValidateTypeLabelExpectedTypes: 'Μόνο αρχεία PDF',
-    maxFileSize: '10MB',
-    labelIdle: 'Σύρε εδώ ένα <span class="filepond--label-action">PDF</span> ή κάνε κλικ'
-  });
-}
-
-// --- assignments (με κουμπιά ενεργειών) ---
+// ================== Assignments ==================
 async function loadAssignments(){
   const rows = await api('/api/teacher/assignments');
   const tb = $('assignmentsTbody'); clear(tb);
@@ -154,27 +178,29 @@ async function loadAssignments(){
     const badge = document.createElement('span');
     badge.className = 'badge';
     badge.textContent = r.status;
+    badge.dataset.status = r.status; // χρωματισμός μέσω CSS
     st.appendChild(badge);
     tr.appendChild(st);
 
-    // Ενέργειες
-    const act = document.createElement('td');
+    const act = document.createElement('td'); act.className='text-right';
 
-    if (r.status === 'under_assignment') {
-      act.appendChild(makeBtn('Οριστικοποίηση', async ()=>{
-        try {
-          await api(`/api/teacher/assignments/${r.id}/confirm`, { method:'POST' });
-          await loadAssignments();
-        } catch(e){ alert(e.message); }
-      }));
-    } else if (r.status === 'active') {
-      act.appendChild(makeBtn('Αίτηση Εξέτασης', async ()=>{
-        try {
-          await api(`/api/teacher/assignments/${r.id}/request-review`, { method:'POST' });
-          await loadAssignments();
-        } catch(e){ alert(e.message); }
-      }));
-    } else {
+    if(r.status === 'under_assignment'){
+      const b = makeBtn('Οριστικοποίηση');
+      b.addEventListener('click', async ()=>{
+        try{ setLoading(b, true); await api(`/api/teacher/assignments/${r.id}/confirm`, { method:'POST' }); toast('Η ανάθεση έγινε ενεργή'); await loadAssignments(); }
+        catch(_e){}
+        finally{ setLoading(b, false); }
+      });
+      act.appendChild(b);
+    }else if(r.status === 'active'){
+      const b = makeBtn('Αίτηση Εξέτασης');
+      b.addEventListener('click', async ()=>{
+        try{ setLoading(b, true); await api(`/api/teacher/assignments/${r.id}/request-review`, { method:'POST' }); toast('Στάλθηκε για εξέταση'); await loadAssignments(); }
+        catch(_e){}
+        finally{ setLoading(b, false); }
+      });
+      act.appendChild(b);
+    }else{
       act.appendChild(document.createTextNode('—'));
     }
 
@@ -183,37 +209,36 @@ async function loadAssignments(){
   });
 }
 
-//cancel assignment
+// προαιρετική ακύρωση ανάθεσης (κρατά IDs όπως στο HTML σου)
+$('btn-cancel-assignment')?.addEventListener('click', async (e)=>{
+  const btn = e.currentTarget;
+  const id = Number($('cancel-assignment-id').value.trim());
+  const reason = $('cancel-reason').value.trim();
+  const msg = $('cancel-msg'); msg.textContent = '';
 
-document.getElementById('btn-cancel-assignment')?.addEventListener('click', async () => {
-  const id = Number(document.getElementById('cancel-assignment-id').value.trim());
-  const reason = document.getElementById('cancel-reason').value.trim();
-  const msg = document.getElementById('cancel-msg');
-  msg.textContent = '';
+  if(!id){ msg.textContent = 'Δώσε assignment_id'; return; }
+  if(!confirm('Σίγουρα ακύρωση ανάθεσης;')) return;
 
-  if (!id) { msg.textContent = 'Δώσε assignment_id'; return; }
-  if (!confirm('Σίγουρα ακύρωση ανάθεσης;')) return;
-
-  try {
-    const res = await fetch(`/api/teacher/assignments/${id}/cancel`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type':'application/json','Accept': 'application/json' },
+  try{
+    setLoading(btn, true);
+    const r = await fetch(`/api/teacher/assignments/${id}/cancel`, {
+      method:'POST',
+      credentials:'same-origin',
+      headers:{ 'Content-Type':'application/json', 'Accept':'application/json' },
       body: JSON.stringify({ reason })
     });
-    const data = await res.json();
-    if (!res.ok) throw (data || { message: res.statusText });
+    const data = await r.json().catch(()=> ({}));
+    if(!r.ok) throw new Error(data.message || r.statusText);
     msg.textContent = '✅ Ακυρώθηκε.';
-    // Προαιρετικά: ανανέωσε λίστα αναθέσεων
-    // loadAssignments();
-  } catch (e) {
+    await loadAssignments();
+  }catch(e){
     msg.textContent = `❌ ${e.message || 'Σφάλμα'}`;
+  }finally{
+    setLoading(btn, false);
   }
 });
 
-
-
-// --- invitations (accept/reject χωρίς innerHTML) ---
+// ================== Invitations ==================
 async function loadInvitations(){
   const rows = await api('/api/teacher/invitations');
   const tb = $('invTbody'); clear(tb);
@@ -223,92 +248,80 @@ async function loadInvitations(){
     tr.appendChild(td(r.id));
     tr.appendChild(td(esc(r.title)));
     tr.appendChild(td(r.student));
-    tr.appendChild(td(r.status));
 
-    const act = document.createElement('td');
-    if (r.status === 'pending') {
-      const accept = makeBtn('Αποδοχή', async ()=>{
+    const st = document.createElement('td');
+    const badge = document.createElement('span');
+    badge.className='badge';
+    badge.textContent = r.status;
+    badge.dataset.status = r.status;
+    st.appendChild(badge);
+    tr.appendChild(st);
+
+    const act = document.createElement('td'); act.className='text-right';
+    if(r.status === 'pending'){
+      const accept = makeBtn('Αποδοχή');
+      const reject = makeBtn('Απόρριψη','secondary');
+
+      accept.addEventListener('click', async ()=>{
         try{
+          setLoading(accept, true);
           await api('/api/teacher/invitations/respond',{
             method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ invitation_id: r.id, action: 'accept' })
+            body: JSON.stringify({ invitation_id: r.id, action:'accept' })
           });
-          loadInvitations();
-        }catch(e){ alert(e.message); }
+          toast('Πρόσκληση: αποδοχή');
+          await loadInvitations();
+        }catch(_e){} finally{ setLoading(accept,false); }
       });
-      const reject = makeBtn('Απόρριψη', async ()=>{
+
+      reject.addEventListener('click', async ()=>{
         try{
+          setLoading(reject, true);
           await api('/api/teacher/invitations/respond',{
             method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ invitation_id: r.id, action: 'reject' })
+            body: JSON.stringify({ invitation_id: r.id, action:'reject' })
           });
-          loadInvitations();
-        }catch(e){ alert(e.message); }
+          toast('Πρόσκληση: απόρριψη');
+          await loadInvitations();
+        }catch(_e){} finally{ setLoading(reject,false); }
       });
-      act.appendChild(accept);
-      act.appendChild(reject);
-    } else {
+
+      act.appendChild(accept); act.appendChild(reject);
+    }else{
       act.appendChild(document.createTextNode('—'));
     }
-
     tr.appendChild(act);
+
     tb.appendChild(tr);
   });
 }
 
-// --- stats (μένει όπως το είχες) ---
+// ================== Stats & Export ==================
 async function loadStats(){
   const s = await api('/api/teacher/stats');
-  const ctx = $('statsChart');
-  new Chart(ctx, {
-    type: 'bar',
-    data: {
+  new Chart($('statsChart'), {
+    type:'bar',
+    data:{
       labels:['Πλήθος','Μ.Ο. Ημέρες','Μ.Ο. Βαθμός'],
       datasets:[{ label:'Στατιστικά', data:[s.total_supervised, s.avg_days_open, s.avg_grade] }]
     },
-    options: { responsive:true, plugins:{ legend:{ display:false } } }
+    options:{ responsive:true, plugins:{ legend:{ display:false } } }
   });
 }
 
-// --- actions ---
-$('createTopicBtn').onclick = async ()=>{
-  const title = $('t_title').value.trim();
-  const description = $('t_desc').value.trim();
-  if(!title) return alert('Τίτλος υποχρεωτικός');
+$('exportJson')?.addEventListener('click', e=>{ e.preventDefault(); window.open('/api/teacher/theses/export?format=json','_blank'); });
+$('exportCsv') ?.addEventListener('click', e=>{ e.preventDefault(); window.open('/api/teacher/theses/export?format=csv','_blank'); });
+
+// ================== bootstrap ==================
+document.addEventListener('DOMContentLoaded', async ()=>{
   try{
-    await api('/api/teacher/topics',{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ title, description })
-    });
-    $('t_title').value=''; $('t_desc').value='';
-    loadTopics();
-  }catch(e){ alert(e.message); }
-};
-
-$('assignBtn').onclick = async ()=>{
-  const topic_id   = Number($('a_topic').value);
-  const student_id = Number($('a_student').value);
-  if(!topic_id || !student_id) return alert('Συμπλήρωσε IDs');
-  try{
-    await api('/api/teacher/assign',{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ topic_id, student_id })
-    });
-    loadAssignments();
-  }catch(e){ alert(e.message); }
-};
-
-$('logoutBtn').onclick = async ()=>{
-  await api('/api/auth/logout',{ method:'POST' });
-  location.href='/';
-};
-
-$('exportJson').onclick = (e)=>{ e.preventDefault(); window.open('/api/teacher/theses/export?format=json','_blank'); };
-$('exportCsv').onclick  = (e)=>{ e.preventDefault(); window.open('/api/teacher/theses/export?format=csv','_blank'); };
-
-// --- initial load ---
-loadMe(); 
-loadTopics(); 
-loadAssignments(); 
-loadInvitations(); 
-loadStats();
+    initFilePond();
+    await loadMe();
+    await loadTopics();
+    await loadAssignments();
+    await loadInvitations();
+    await loadStats();
+  }catch(e){
+    if(String(e.message).toLowerCase().includes('unauthorized')) location.href='/';
+  }
+});

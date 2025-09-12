@@ -1,194 +1,243 @@
-console.log('secretary.js loaded');
+// =========================
+// Secretary UI (polished)
+// =========================
 
-const $ = (id) => document.getElementById(id);
-
-const fetchJSON = (url, opts={}) =>
-  fetch(url, { credentials:'include', headers:{'Content-Type':'application/json'}, ...opts })
-    .then(async r => {
-      const isJson = r.headers.get('content-type')?.includes('application/json');
-      const data = isJson ? await r.json() : null;
-      if (!r.ok) throw (data || { message:r.statusText });
-      return data;
-    });
-
-$('logout').onclick = async () => {
-  try { await fetchJSON('/api/auth/logout', { method:'POST' }); } catch {}
-  location.href = '/';
+// ---- Endpoints (όπως τα έχεις) ----
+const ENDPOINTS = {
+  me:                 '/api/auth/me',
+  logout:             '/api/auth/logout',
+  list:               '/api/secretariat/assignments',                  // GET
+  details:            (id)=> `/api/secretariat/assignments/${id}`,     // GET
+  importUsers:        '/api/secretariat/import-users',                 // POST
+  gsApproval:         (id)=> `/api/secretariat/assignments/${id}/gs-approval`,
+  cancelAssignment:   (id)=> `/api/secretariat/assignments/${id}/cancel`,
+  completeAssignment: (id)=> `/api/secretariat/assignments/${id}/complete`,
 };
 
-async function loadList() {
-  const ul = $('list');
-  ul.innerHTML = 'Φόρτωση...';
-  try {
-    const rows = await fetchJSON('/api/secretariat/assignments');
-    ul.innerHTML = '';
-    rows.forEach(r => {
-      const li = document.createElement('li');
-      li.style.cursor = 'pointer';
-      li.innerHTML = `
-        <strong>#${r.id}</strong> — ${r.title}
-        <br><small>Φοιτητής: ${r.student_name || r.student_username} — Επιβλέπων: ${r.supervisor_name || r.supervisor_username}</small>
-        <br><small>Κατάσταση: ${r.status} — Ημέρες από ανάθεση: ${r.days_since_assignment ?? '—'} — Αποδεχθέντα μέλη: ${r.accepted_members}</small>
-      `;
-      li.onclick = () => loadDetails(r.id);
-      ul.appendChild(li);
-    });
-  } catch (e) {
-    ul.innerHTML = `❌ Σφάλμα: ${e.message || 'Server error'}`;
-  }
+// ---------- helpers ----------
+const $ = (id)=> document.getElementById(id);
+function clear(node){ while(node && node.firstChild) node.removeChild(node.firstChild); }
+
+function toast(msg,type='success'){
+  const wrap = document.querySelector('.toast-wrap') || (()=>{ const w=document.createElement('div'); w.className='toast-wrap'; document.body.appendChild(w); return w; })();
+  const t=document.createElement('div'); t.className='toast ' + (type==='error'?'error':'success'); t.textContent=msg;
+  wrap.appendChild(t); setTimeout(()=>t.remove(), 2600);
 }
-
-async function loadDetails(id) {
-  const box = $('details');
-  box.innerHTML = 'Φόρτωση...';
-  try {
-    const d = await fetchJSON('/api/secretariat/assignments/' + id);
-    const committeeHtml = (d.committee || [])
-      .map(c => `<li>${c.full_name || c.username} — ${c.status}</li>`).join('');
-    box.innerHTML = `
-      <p><strong>Θέμα:</strong> ${d.title}</p>
-      <p><strong>Περιγραφή:</strong> ${d.description || '—'}</p>
-      <p><strong>Κατάσταση:</strong> ${d.status}</p>
-      <p><strong>Φοιτητής:</strong> ${d.student_name || d.student_username} (${d.student_email || '—'})</p>
-      <p><strong>Επιβλέπων:</strong> ${d.supervisor_name || d.supervisor_username} (${d.supervisor_email || '—'})</p>
-      <p><strong>Από επίσημη ανάθεση:</strong> ${d.days_since_assignment ?? '—'} ημέρες</p>
-      <h3>Τριμελής</h3>
-      <ul>${committeeHtml || '<li>—</li>'}</ul>
-      <h3>Στοιχεία εξέτασης</h3>
-      <p>
-        Ημ/νία: ${d.exam_datetime || '—'}<br/>
-        Τρόπος: ${d.exam_mode || '—'}<br/>
-        ${d.exam_room ? 'Αίθουσα: ' + d.exam_room + '<br/>' : ''}
-        ${d.meeting_url ? 'Σύνδεσμος: <a href="'+d.meeting_url+'" target="_blank">'+d.meeting_url+'</a>' : ''}
-      </p>
-    `;
-  } catch (e) {
-    box.innerHTML = `❌ Σφάλμα: ${e.message || 'Server error'}`;
-  }
+function setLoading(btn,on){
+  if(!btn) return;
+  btn.disabled = !!on;
+  if(on){ btn.dataset.prev = btn.textContent; btn.textContent = 'Παρακαλώ…'; }
+  else  { btn.textContent = btn.dataset.prev || btn.textContent; }
 }
-
-
-
-
-// ----- Import JSON users -----
-document.getElementById('btn-import')?.addEventListener('click', async () => {
-  const fileInput = document.getElementById('json-file');
-  const msg = document.getElementById('import-msg');
-  msg.textContent = '';
-
-  const file = fileInput?.files?.[0];
-  if (!file) { msg.textContent = 'Διάλεξε ένα .json αρχείο.'; return; }
-
-  try {
-    const text = await file.text();
-    let payload = null;
-    try {
-      payload = JSON.parse(text);
-    } catch (e) {
-      msg.textContent = 'Το αρχείο δεν είναι έγκυρο JSON.';
-      return;
-    }
-
-    const res = await fetch('/api/secretariat/import-users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(payload)
-    });
-
-    const isJson = res.headers.get('content-type')?.includes('application/json');
-    const data = isJson ? await res.json() : null;
-
-    if (!res.ok) {
-      msg.textContent = `❌ Error ${res.status}: ${data?.message || res.statusText}`;
-      return;
-    }
-
-    msg.innerHTML = `✅ ΟΚ — Inserted: ${data.inserted}, Updated: ${data.updated}${
-      data.errors?.length ? '<br>⚠️ Σφάλματα: ' + data.errors.length : ''
-    }`;
-
-    if (data.errors?.length) {
-      console.warn('Import errors:', data.errors);
-    }
-
-    // (προαιρετικό) ανανέωση λίστας
-    if (typeof loadList === 'function') loadList();
-
-  } catch (e) {
-    console.error(e);
-    msg.textContent = '❌ Σφάλμα δικτύου';
-  }
-});
-
-
-const actMsg = document.getElementById('act-msg');
-const getVal = id => document.getElementById(id)?.value?.trim();
-
-async function postJson(url, body) {
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type':'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(body || {})
-  });
+async function api(url, opts={}){
+  const r = await fetch(url, { credentials:'same-origin', ...opts });
   const isJson = r.headers.get('content-type')?.includes('application/json');
-  const data = isJson ? await r.json() : null;
-  if (!r.ok) throw (data || { message: r.statusText });
+  const data = isJson ? await r.json().catch(()=> ({})) : {};
+  if(!r.ok){
+    const msg = data.message || r.statusText || 'Σφάλμα αιτήματος';
+    toast(msg,'error'); throw new Error(msg);
+  }
   return data;
 }
 
-// ΑΠ ΓΣ
-document.getElementById('btn-gs-approval')?.addEventListener('click', async () => {
-  actMsg.textContent = '';
-  const id = Number(getVal('act-assignment-id'));
-  const number = getVal('gs-number');
-  const year = Number(getVal('gs-year'));
-  if (!id || !number || !year) { actMsg.textContent='Συμπλήρωσε ID, αριθμό & έτος ΓΣ.'; return; }
-  try {
-    await postJson(`/api/secretariat/assignments/${id}/gs-approval`, { number, year });
-    actMsg.textContent = '✅ Καταχωρήθηκε ο ΑΠ ΓΣ.';
-    if (typeof loadDetails === 'function') loadDetails(id);
-    if (typeof loadList === 'function') loadList();
-  } catch (e) {
-    actMsg.textContent = `❌ ${e.message || 'Σφάλμα'}`;
+// ---------- welcome / logout ----------
+async function loadWelcome(){
+  try{
+    const { user } = await api(ENDPOINTS.me);
+    const w = $('welcome'); if(w) w.textContent = `Καλώς ήρθες, ${user.full_name || user.username} (${user.role})`;
+  }catch(_e){}
+}
+$('logout')?.addEventListener('click', async ()=>{
+  const btn = $('logout');
+  try{ setLoading(btn,true); await api(ENDPOINTS.logout,{method:'POST'}); }
+  catch(_e){} finally{ setLoading(btn,false); location.href='/'; }
+});
+
+// ---------- λίστα & λεπτομέρειες ----------
+async function loadList(){
+  const ul = $('list'); if(!ul) return;
+  clear(ul); ul.innerHTML = '<li class="muted">Φόρτωση…</li>';
+  try{
+    const rows = await api(ENDPOINTS.list);
+    clear(ul);
+    if(!rows?.length){ ul.innerHTML = '<li class="muted">Δεν βρέθηκαν εγγραφές.</li>'; return; }
+
+    rows.forEach(r=>{
+      const li = document.createElement('li');
+      li.style.padding='8px 0';
+      li.style.borderBottom='1px solid var(--border)';
+
+      const btn = document.createElement('button');
+      btn.type='button'; btn.className='secondary small';
+      btn.textContent = `#${r.id} — ${r.title || 'Θέμα'} — ${r.status} — ${r.student_name || r.student_username || 'Φοιτητής'}`;
+      btn.addEventListener('click', ()=> loadDetails(r.id));
+
+      li.appendChild(btn);
+      ul.appendChild(li);
+    });
+  }catch(_e){
+    clear(ul); ul.innerHTML = '<li class="muted">Σφάλμα φόρτωσης.</li>';
+  }
+}
+
+async function loadDetails(id){
+  const box = $('details'); if(!box) return;
+  box.textContent = 'Φόρτωση…';
+  try{
+    const d = await api(ENDPOINTS.details(id));
+    const committee = Array.isArray(d.committee) ? d.committee : [];
+    const wrap = document.createElement('div');
+    wrap.style.display='grid'; wrap.style.gap='6px';
+
+    const addLine = (k,v)=>{
+      const row=document.createElement('div');
+      const b=document.createElement('strong'); b.textContent = k+': '; row.appendChild(b);
+      if(k==='Σύνδεσμος' && v && typeof v==='string'){
+        const a=document.createElement('a'); a.href=v; a.textContent=v; a.target='_blank'; a.rel='noopener';
+        row.appendChild(a);
+      }else{
+        row.append(String(v ?? '—'));
+      }
+      wrap.appendChild(row);
+    };
+
+    addLine('ID', d.id);
+    addLine('Τίτλος', d.title);
+    addLine('Περιγραφή', d.description);
+    addLine('Κατάσταση', d.status);
+    addLine('Φοιτητής', d.student_name || d.student_username);
+    addLine('Email Φοιτητή', d.student_email);
+    addLine('Επιβλέπων', d.supervisor_name || d.supervisor_username);
+    addLine('Email Επιβλέποντα', d.supervisor_email);
+    addLine('Από επίσημη ανάθεση (ημ.)', d.created_at ? new Date(d.created_at).toLocaleString() : '—');
+    addLine('ΑΠ ΓΣ', (d.ap_gs_number && d.ap_gs_year) ? `${d.ap_gs_number}/${d.ap_gs_year}` : '—');
+    addLine('Draft URL', d.draft_url);
+    addLine('Repository', d.repository_url);
+
+    // Επιτροπή
+    const cTitle=document.createElement('h3'); cTitle.textContent='Τριμελής'; wrap.appendChild(cTitle);
+    const cul=document.createElement('ul'); cul.style.listStyle='none'; cul.style.padding='0';
+    if(committee.length){
+      committee.forEach(c=>{
+        const li=document.createElement('li');
+        li.textContent = `${c.full_name || c.username} — ${c.status}`;
+        cul.appendChild(li);
+      });
+    }else{
+      const li=document.createElement('li'); li.textContent='—'; cul.appendChild(li);
+    }
+    wrap.appendChild(cul);
+
+    // Εξέταση
+    const eTitle=document.createElement('h3'); eTitle.textContent='Στοιχεία εξέτασης'; wrap.appendChild(eTitle);
+    addLine('Ημ/νία', d.exam_datetime);
+    addLine('Τρόπος', d.exam_mode);
+    addLine('Αίθουσα', d.exam_room);
+    addLine('Σύνδεσμος', d.meeting_url);
+
+    clear(box); box.appendChild(wrap);
+
+    // Προγεμίζουμε το πεδίο ID ενεργειών
+    const idInput = $('act-assignment-id'); if(idInput && !idInput.value) idInput.value = d.id;
+  }catch(e){
+    box.textContent = e.message || 'Σφάλμα φόρτωσης.';
+  }
+}
+
+// ---------- import JSON χρηστών ----------
+$('btn-import')?.addEventListener('click', async ()=>{
+  const file = $('json-file')?.files?.[0];
+  const msg = $('import-msg'); if(msg) msg.textContent = '';
+  if(!file){ toast('Διάλεξε αρχείο JSON','error'); return; }
+
+  try{
+    const text = await file.text();
+    let payload;
+    try{ payload = JSON.parse(text); }
+    catch{ toast('Μη έγκυρο JSON','error'); return; }
+
+    const btn=$('btn-import'); setLoading(btn,true);
+    await api(ENDPOINTS.importUsers, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(payload)
+    });
+    toast('Η εισαγωγή ολοκληρώθηκε');
+    if(msg) msg.textContent='✅ ΟΚ';
+    await loadList();
+  }catch(_e){
+    if(msg) msg.textContent='❌ Αποτυχία εισαγωγής';
+  }finally{
+    setLoading($('btn-import'),false);
   }
 });
 
-// Ακύρωση ανάθεσης
-document.getElementById('btn-cancel')?.addEventListener('click', async () => {
-  actMsg.textContent = '';
+// ---------- ενέργειες ανάθεσης ----------
+const actMsg = $('act-msg');
+const getVal = id => $(id)?.value?.trim();
+
+$('btn-gs-approval')?.addEventListener('click', async ()=>{
+  if(actMsg) actMsg.textContent='';
+  const id = Number(getVal('act-assignment-id'));
+  const number = getVal('gs-number');
+  const year = Number(getVal('gs-year'));
+  if(!id || !number || !year){ if(actMsg) actMsg.textContent='Συμπλήρωσε ID, αριθμό & έτος ΓΣ.'; return; }
+
+  const btn = $('btn-gs-approval');
+  try{
+    setLoading(btn,true);
+    await api(ENDPOINTS.gsApproval(id), {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ number, year })
+    });
+    toast('Καταχωρήθηκε ο ΑΠ ΓΣ');
+    await loadDetails(id); await loadList();
+  }catch(e){
+    if(actMsg) actMsg.textContent = `❌ ${e.message || 'Σφάλμα'}`;
+  }finally{ setLoading(btn,false); }
+});
+
+$('btn-cancel')?.addEventListener('click', async ()=>{
+  if(actMsg) actMsg.textContent='';
   const id = Number(getVal('act-assignment-id'));
   const gs_number = getVal('gs-number');
   const gs_year = Number(getVal('gs-year'));
   const reason = getVal('cancel-reason') || 'κατόπιν αίτησης Φοιτητή/τριας';
-  if (!id || !gs_number || !gs_year) { actMsg.textContent='Συμπλήρωσε ID και ΓΣ (αριθμός/έτος).'; return; }
-  if (!confirm('Σίγουρα ακύρωση ανάθεσης;')) return;
-  try {
-    await postJson(`/api/secretariat/assignments/${id}/cancel`, { gs_number, gs_year, reason });
-    actMsg.textContent = '✅ Η ανάθεση ακυρώθηκε.';
-    if (typeof loadDetails === 'function') loadDetails(id);
-    if (typeof loadList === 'function') loadList();
-  } catch (e) {
-    actMsg.textContent = `❌ ${e.message || 'Σφάλμα'}`;
-  }
+  if(!id || !gs_number || !gs_year){ if(actMsg) actMsg.textContent='Συμπλήρωσε ID και ΓΣ (αριθμός/έτος).'; return; }
+  if(!confirm('Σίγουρα ακύρωση ανάθεσης;')) return;
+
+  const btn = $('btn-cancel');
+  try{
+    setLoading(btn,true);
+    await api(ENDPOINTS.cancelAssignment(id), {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ gs_number, gs_year, reason })
+    });
+    toast('Η ανάθεση ακυρώθηκε');
+    await loadDetails(id); await loadList();
+  }catch(e){
+    if(actMsg) actMsg.textContent = `❌ ${e.message || 'Σφάλμα'}`;
+  }finally{ setLoading(btn,false); }
 });
 
-// Ολοκλήρωση (Υπό Εξέταση → Περατωμένη)
-document.getElementById('btn-complete')?.addEventListener('click', async () => {
-  actMsg.textContent = '';
+$('btn-complete')?.addEventListener('click', async ()=>{
+  if(actMsg) actMsg.textContent='';
   const id = Number(getVal('act-assignment-id'));
-  if (!id) { actMsg.textContent='Δώσε ID ΔΕ.'; return; }
-  try {
-    await postJson(`/api/secretariat/assignments/${id}/complete`, {});
-    actMsg.textContent = '✅ Η ΔΕ έγινε Περατωμένη.';
-    if (typeof loadDetails === 'function') loadDetails(id);
-    if (typeof loadList === 'function') loadList();
-  } catch (e) {
-    actMsg.textContent = `❌ ${e.message || 'Σφάλμα'}`;
-  }
+  if(!id){ if(actMsg) actMsg.textContent='Δώσε ID ΔΕ.'; return; }
+
+  const btn = $('btn-complete');
+  try{
+    setLoading(btn,true);
+    await api(ENDPOINTS.completeAssignment(id), { method:'POST' });
+    toast('Η ΔΕ έγινε Περατωμένη');
+    await loadDetails(id); await loadList();
+  }catch(e){
+    if(actMsg) actMsg.textContent = `❌ ${e.message || 'Σφάλμα'}`;
+  }finally{ setLoading(btn,false); }
 });
 
-
-
-document.addEventListener('DOMContentLoaded', loadList);
+// ---------- bootstrap ----------
+document.addEventListener('DOMContentLoaded', async ()=>{
+  await loadWelcome();
+  await loadList();
+});

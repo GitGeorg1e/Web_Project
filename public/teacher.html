@@ -1,164 +1,258 @@
 <!doctype html>
 <html lang="el">
 <head>
-  <meta charset="utf-8">
-  <title>Teacher — Thesis System</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/styles.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Πίνακας Διδάσκοντα — Thesis System</title>
+
+  <link rel="stylesheet" href="/styles.css" />
+
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- FilePond (PDF uploader) -->
   <link rel="stylesheet" href="https://unpkg.com/filepond/dist/filepond.min.css">
   <script src="https://unpkg.com/filepond/dist/filepond.min.js"></script>
   <script src="https://unpkg.com/filepond-plugin-file-validate-type/dist/filepond-plugin-file-validate-type.min.js"></script>
   <script src="https://unpkg.com/filepond-plugin-file-validate-size/dist/filepond-plugin-file-validate-size.min.js"></script>
 </head>
-</head>
 <body>
-<div class="container">
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <h1>Πίνακας Διδάσκοντα</h1>
-      <button id="logoutBtn">Logout</button>
-    </div>
-    <p id="welcome"></p>
-  </div>
 
-  <div class="grid grid2">
-     <div class="card">
-      <h2>Θέμα διπλωματικής (Δημιουργία / Επεξεργασία)</h2>
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="title">Thesis Manager</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span id="welcome" class="muted">—</span>
+      <button id="logoutBtn" class="secondary small">Αποσύνδεση</button>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- Sub-nav -->
+    <nav class="card" aria-label="Πλοήγηση">
+      <div class="actions" style="display:flex;gap:18px;flex-wrap:wrap">
+        <a href="#topics">Θέματα</a>
+        <a href="#assign">Ανάθεση</a>
+        <a href="#my-topics">Τα θέματα μου</a>
+        <a href="#assignments">Αναθέσεις</a>
+        <a href="#theses">Οι διπλωματικές μου</a>
+        <a href="#invitations">Προσκλήσεις</a>
+        <a href="#stats">Στατιστικά</a>
+      </div>
+    </nav>
+
+    <!-- Δημιουργία / Επεξεργασία Θέματος -->
+    <section id="topics" class="card" aria-labelledby="topics-title">
+      <h2 id="topics-title">Θέμα διπλωματικής (Δημιουργία / Επεξεργασία)</h2>
+
+      <div class="grid" style="margin-top:8px">
+        <div>
+          <label for="t_title">Τίτλος</label>
+          <input id="t_title" type="text" placeholder="Π.χ. Distributed Systems Thesis" />
+        </div>
+
+        <div>
+          <label for="t_pdf">Αρχείο PDF (προαιρετικό)</label>
+          <input id="t_pdf" type="file" accept="application/pdf" />
+        </div>
+
+        <div style="grid-column:1 / -1">
+          <label for="t_desc">Σύνοψη</label>
+          <textarea id="t_desc" placeholder="Σύντομη περιγραφή του θέματος..."></textarea>
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <button id="createTopicBtn" class="btn">Αποθήκευση</button>
+          <button id="cancelEditBtn" class="secondary">Ακύρωση επεξεργασίας</button>
+        </div>
+      </div>
+
+      <small id="topicFormHint" class="muted" style="display:block;margin-top:10px">
+        Λειτουργία: Δημιουργία
+      </small>
+    </section>
+
+    <!-- Ανάθεση θέματος -->
+    <section id="assign" class="card" aria-labelledby="assign-title">
+      <h2 id="assign-title">Ανάθεση Θέματος</h2>
+
+      <div class="grid" style="margin-top:8px">
+        <div>
+          <label for="a_topic">ID Θέματος</label>
+          <input id="a_topic" type="number" placeholder="π.χ. 5" />
+        </div>
+        <div>
+          <label for="a_student">ID Φοιτητή</label>
+          <input id="a_student" type="number" placeholder="π.χ. 12" />
+        </div>
+        <div style="display:flex;gap:10px">
+          <button id="assignBtn" class="btn">Ανάθεση</button>
+        </div>
+      </div>
+
+      <!-- Ακύρωση ανάθεσης (κρατώ τα ίδια IDs σου) -->
+      <div class="spacer"></div>
       <div class="grid">
-        <input id="t_title" placeholder="Τίτλος">
-        <textarea id="t_desc" placeholder="Σύνοψη"></textarea>
-        <input id="t_pdf" type="file" accept="application/pdf">
-        <button id="createTopicBtn">Αποθήκευση</button>
-        <button id="cancelEditBtn" class="secondary">Ακύρωση επεξεργασίας</button>
+        <div>
+          <label for="cancel-assignment-id">assignment_id</label>
+          <input id="cancel-assignment-id" placeholder="π.χ. 23" />
+        </div>
+        <div>
+          <label for="cancel-reason">Reason (optional)</label>
+          <input id="cancel-reason" placeholder="Προαιρετικά, αιτιολογία" />
+        </div>
+        <div style="display:flex;align-items:end;gap:10px">
+          <button id="btn-cancel-assignment" type="button" class="secondary">Ακύρωση ανάθεσης</button>
+          <p id="cancel-msg" class="muted" style="margin:0"></p>
+        </div>
       </div>
-      <small id="topicFormHint">Λειτουργία: Δημιουργία</small>
-    </div>
+    </section>
 
-
-    <div class="card">
-      <h2>Ανάθεση Θέματος</h2>
-      <label>ID Θέματος <input id="a_topic"></label>
-      <label>ID Φοιτητή <input id="a_student"></label>
-      <button id="assignBtn">Ανάθεση</button>
-      <div class="row">
-  <input id="cancel-assignment-id" placeholder="assignment_id" />
-  <input id="cancel-reason" placeholder="Reason (optional)" />
-  <button id="btn-cancel-assignment" type="button">Ακύρωση ανάθεσης</button>
-  <p id="cancel-msg"></p>
-</div>
-
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Τα Θέματά μου</h2>
-    <table class="table"><thead><tr><th>ID</th><th>Τίτλος</th><th>Δημιουργήθηκε</th></tr></thead>
-      <tbody id="topicsTbody"></tbody></table>
-  </div>
-
-  <div class="card">
-  <h2>Αναθέσεις</h2>
-  <table class="table">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Φοιτητής</th>
-        <th>Θέμα</th>
-        <th>Κατάσταση</th>
-        <th>Ενέργειες</th> 
-      </tr>
-    </thead>
-    <tbody id="assignmentsTbody"></tbody>
-  </table>
-
-  <p>
-    <a id="exportJson" href="#">Export JSON</a> •
-    <a id="exportCsv" href="#">Export CSV</a>
-  </p>
-</div>
-
-
-<section class="card" id="my-theses">
-  <h2>Οι διπλωματικές μου</h2>
-
-  <div class="row" style="gap:8px;align-items:flex-end">
-    <div>
-      <label>Ρόλος</label>
-      <select id="flt-role">
-        <option value="">— Όλοι —</option>
-        <option value="supervisor">Επιβλέπων</option>
-        <option value="committee">Τριμελής</option>
-      </select>
-    </div>
-
-    <div>
-      <label>Κατάσταση</label>
-      <select id="flt-status">
-        <option value="">— Όλες —</option>
-        <option value="under_assignment">Υπό ανάθεση</option>
-        <option value="active">Ενεργή</option>
-        <option value="under_review">Υπό εξέταση</option>
-        <option value="completed">Περατωμένη</option>
-        <option value="canceled">Ακυρωμένη</option>
-      </select>
-    </div>
-
-    <div>
-      <label>Ανά σελίδα</label>
-      <select id="flt-pagesize">
-        <option>10</option>
-        <option selected>20</option>
-        <option>50</option>
-      </select>
-    </div>
-
-    <button id="btn-apply" type="button">Εφαρμογή</button>
-  </div>
-
-  <div id="theses-result" style="margin-top:12px">
-    <div class="row" style="justify-content:space-between;margin:8px 0">
-      <div id="pager-info"></div>
-      <div>
-        <button id="btn-prev" type="button">◀ Προηγούμενη</button>
-        <button id="btn-next" type="button">Επόμενη ▶</button>
+    <!-- Λίστα Θεμάτων -->
+    <section id="my-topics" class="card" aria-labelledby="my-topics-title">
+      <h2 id="my-topics-title">Τα θέματα μου</h2>
+      <div class="spacer"></div>
+      <div style="overflow:auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Τίτλος</th>
+              <th>PDF</th>
+              <th>Δημιουργήθηκε</th>
+              <th class="text-right">Ενέργειες</th>
+            </tr>
+          </thead>
+          <tbody id="topicsTbody"></tbody>
+        </table>
       </div>
-    </div>
+    </section>
 
-    <div style="overflow:auto">
-      <table id="theses-table" border="0" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr style="border-bottom:1px solid #eee;text-align:left">
-            <th>#</th>
-            <th>Ρόλος</th>
-            <th>Κατάσταση</th>
-            <th>Τίτλος</th>
-            <th>Φοιτητής</th>
-            <th>Ανάθεση</th>
-            <th>Επιτροπή (αν ισχύει)</th>
-          </tr>
-        </thead>
-        <tbody id="theses-body">
-          <tr><td colspan="7">Φόρτωση…</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
+    <!-- Αναθέσεις -->
+    <section id="assignments" class="card" aria-labelledby="assignments-title">
+      <h2 id="assignments-title">Αναθέσεις</h2>
+      <div class="spacer"></div>
+      <div style="overflow:auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Φοιτητής</th>
+              <th>Θέμα</th>
+              <th>Κατάσταση</th>
+              <th class="text-right">Ενέργειες</th>
+            </tr>
+          </thead>
+          <tbody id="assignmentsTbody"></tbody>
+        </table>
+      </div>
+      <div class="actions" style="margin-top:10px">
+        <a id="exportJson" href="#">Export JSON</a> •
+        <a id="exportCsv" href="#">Export CSV</a>
+      </div>
+    </section>
 
+    <!-- Οι διπλωματικές μου (κρατάω όλα τα IDs που ήδη χρησιμοποιείς) -->
+    <section id="theses" class="card" aria-labelledby="theses-title">
+      <h2 id="theses-title">Οι διπλωματικές μου</h2>
 
-  <div class="card">
-    <h2>Προσκλήσεις Τριμελούς</h2>
-    <table class="table"><thead><tr><th>ID</th><th>Θέμα</th> <th>Φοιτητής</th><th>Κατάσταση</th><th>Ενέργεια</th></tr></thead>
-      <tbody id="invTbody"></tbody></table>
-  </div>
+      <div class="row" style="gap:8px;align-items:flex-end">
+        <div>
+          <label for="flt-role">Ρόλος</label>
+          <select id="flt-role">
+            <option value="">— Όλοι —</option>
+            <option value="supervisor">Επιβλέπων</option>
+            <option value="committee">Τριμελής</option>
+          </select>
+        </div>
 
-  <div class="card">
-    <h2>Στατιστικά</h2>
-    <canvas id="statsChart"></canvas>
-  </div>
-</div>
-<script src="/js/teacher-theses.js" defer></script>
-<script src="/js/teacher.js"></script>
+        <div>
+          <label for="flt-status">Κατάσταση</label>
+          <select id="flt-status">
+            <option value="">— Όλες —</option>
+            <option value="under_assignment">Υπό ανάθεση</option>
+            <option value="active">Ενεργή</option>
+            <option value="under_review">Υπό εξέταση</option>
+            <option value="completed">Περατωμένη</option>
+            <option value="canceled">Ακυρωμένη</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="flt-pagesize">Ανά σελίδα</label>
+          <select id="flt-pagesize">
+            <option>10</option>
+            <option selected>20</option>
+            <option>50</option>
+          </select>
+        </div>
+
+        <button id="btn-apply" type="button" class="btn">Εφαρμογή</button>
+      </div>
+
+      <div id="theses-result" style="margin-top:12px">
+        <div class="row" style="justify-content:space-between;margin:8px 0">
+          <div id="pager-info"></div>
+          <div>
+            <button id="btn-prev" type="button" class="secondary small">◀ Προηγούμενη</button>
+            <button id="btn-next" type="button" class="secondary small">Επόμενη ▶</button>
+          </div>
+        </div>
+
+        <div style="overflow:auto">
+          <table id="theses-table" class="table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Ρόλος</th>
+                <th>Κατάσταση</th>
+                <th>Τίτλος</th>
+                <th>Φοιτητής</th>
+                <th>Ανάθεση</th>
+                <th>Επιτροπή (αν ισχύει)</th>
+              </tr>
+            </thead>
+            <tbody id="theses-body">
+              <tr><td colspan="7">Φόρτωση…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Προσκλήσεις Τριμελούς -->
+    <section id="invitations" class="card" aria-labelledby="inv-title">
+      <h2 id="inv-title">Προσκλήσεις Τριμελούς</h2>
+      <div class="spacer"></div>
+      <div style="overflow:auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Θέμα</th>
+              <th>Φοιτητής</th>
+              <th>Κατάσταση</th>
+              <th class="text-right">Ενέργεια</th>
+            </tr>
+          </thead>
+          <tbody id="invTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Στατιστικά -->
+    <section id="stats" class="card" aria-labelledby="stats-title">
+      <h2 id="stats-title">Στατιστικά</h2>
+      <div class="spacer"></div>
+      <canvas id="statsChart" width="400" height="160"></canvas>
+    </section>
+
+    <div class="toast-wrap" aria-live="polite" aria-atomic="true"></div>
+  </main>
+
+  <!-- Scripts -->
+  <script src="/js/teacher-theses.js" defer></script>
+  <script src="/js/teacher.js"></script>
 </body>
 </html>
