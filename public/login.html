@@ -7,17 +7,28 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div class="container">
-    <div class="card">
+  <main class="container">
+    <div class="card login-card">
       <h1>Σύνδεση</h1>
-      <div class="grid">
-        <label>Username <input id="username" autocomplete="username" /></label>
-        <label>Password <input id="password" type="password" autocomplete="current-password" /></label>
-        <button id="loginBtn">Login</button>
-        <p id="msg"></p>
-      </div>
+
+      <form id="loginForm" class="login-grid">
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required />
+        </div>
+
+        <div class="actions">
+          <button id="loginBtn" class="btn" type="submit">Login</button>
+          <p id="msg" class="muted" style="margin:0"></p>
+        </div>
+      </form>
     </div>
-  </div>
-  <script src="/js/login.js"></script>
+  </main>
+
+  <script src="/js/login.js" defer></script>
 </body>
 </html>
