@@ -7,10 +7,10 @@
 
   <link rel="stylesheet" href="/styles.css" />
 
-  <!-- Chart.js -->
+  <!-- Chart.js (πρόσεχε CSP/Helmet) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- FilePond (PDF uploader) -->
+  <!-- FilePond (PDF uploader) - πρόσεχε CSP/Helmet -->
   <link rel="stylesheet" href="https://unpkg.com/filepond/dist/filepond.min.css">
   <script src="https://unpkg.com/filepond/dist/filepond.min.js"></script>
   <script src="https://unpkg.com/filepond-plugin-file-validate-type/dist/filepond-plugin-file-validate-type.min.js"></script>
@@ -37,6 +37,7 @@
         <a href="#my-topics">Τα θέματα μου</a>
         <a href="#assignments">Αναθέσεις</a>
         <a href="#theses">Οι διπλωματικές μου</a>
+        <a href="#manage-assignment">Διαχείριση ΔΕ</a>
         <a href="#invitations">Προσκλήσεις</a>
         <a href="#stats">Στατιστικά</a>
       </div>
@@ -91,7 +92,7 @@
         </div>
       </div>
 
-      <!-- Ακύρωση ανάθεσης (κρατώ τα ίδια IDs σου) -->
+      <!-- Ακύρωση ανάθεσης -->
       <div class="spacer"></div>
       <div class="grid">
         <div>
@@ -153,7 +154,7 @@
       </div>
     </section>
 
-    <!-- Οι διπλωματικές μου (κρατάω όλα τα IDs που ήδη χρησιμοποιείς) -->
+    <!-- Οι διπλωματικές μου -->
     <section id="theses" class="card" aria-labelledby="theses-title">
       <h2 id="theses-title">Οι διπλωματικές μου</h2>
 
@@ -221,6 +222,66 @@
       </div>
     </section>
 
+    <!-- ΔΙΑΧΕΙΡΙΣΗ ΔΕ (ΝΕΟ) -->
+    <section class="card" id="manage-assignment" aria-labelledby="manage-title">
+      <h2 id="manage-title">Διαχείριση Διπλωματικής</h2>
+
+      <div class="row" style="gap:8px;align-items:flex-end">
+        <label>Assignment ID
+          <input id="m-assignment-id" placeholder="π.χ. 12">
+        </label>
+        <button id="m-load-invitations" type="button">Προσκλήσεις (Υπό Ανάθεση)</button>
+        <button id="m-cancel-under" type="button">Ακύρωση (Υπό Ανάθεση)</button>
+      </div>
+
+      <details style="margin-top:10px">
+        <summary><strong>Ακύρωση (Ενεργή) — από επιβλέποντα</strong></summary>
+        <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
+          <input id="m-council-number" type="number" placeholder="Αριθμός Γ.Σ.">
+          <input id="m-council-year" type="number" placeholder="Έτος Γ.Σ.">
+          <button id="m-cancel-active" type="button">Ακύρωση (με Γ.Σ.)</button>
+        </div>
+        <small>Απαιτείται να έχουν περάσει 2 έτη από το <code>finalized_at</code>.</small>
+      </details>
+
+      <hr style="margin:12px 0">
+
+      <div class="row" style="gap:8px;align-items:flex-end">
+        <button id="m-list-notes" type="button">Σημειώσεις (Ενεργή)</button>
+        <input id="m-note-text" maxlength="300" placeholder="Νέα σημείωση (έως 300 χαρακτ.)" style="width:300px">
+        <button id="m-add-note" type="button">Προσθήκη σημείωσης</button>
+        <button id="m-move-under-review" type="button">Μετάπτωση σε Υπό Εξέταση</button>
+      </div>
+
+      <hr style="margin:12px 0">
+
+      <div class="row" style="gap:8px;align-items:flex-end">
+        <button id="m-get-draft" type="button">Πρόχειρο/Links (Υπό Εξέταση)</button>
+        <button id="m-announcement" type="button">HTML Ανακοίνωσης</button>
+      </div>
+
+      <details style="margin-top:10px">
+        <summary><strong>Βαθμολόγηση (Υπό Εξέταση)</strong></summary>
+        <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
+          <label>Enable grading
+            <select id="m-grading-enabled">
+              <option value="1">On</option>
+              <option value="0">Off</option>
+            </select>
+          </label>
+          <button id="m-enable-grading" type="button">Αποθήκευση</button>
+        </div>
+        <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
+          <input id="m-grade-total" type="number" step="0.1" min="0" max="10" placeholder="Συνολικός βαθμός 0-10">
+          <input id="m-grade-criteria" placeholder='Κριτήρια (JSON), π.χ. {"quality":9}'>
+          <button id="m-submit-grade" type="button">Καταχώρηση βαθμού</button>
+          <button id="m-list-grades" type="button">Προβολή βαθμών</button>
+        </div>
+      </details>
+
+      <pre id="m-output" style="background:#fafafa;border:1px solid #eee;padding:8px;margin-top:12px;white-space:pre-wrap"></pre>
+    </section>
+
     <!-- Προσκλήσεις Τριμελούς -->
     <section id="invitations" class="card" aria-labelledby="inv-title">
       <h2 id="inv-title">Προσκλήσεις Τριμελούς</h2>
@@ -253,6 +314,7 @@
 
   <!-- Scripts -->
   <script src="/js/teacher-theses.js" defer></script>
-  <script src="/js/teacher.js"></script>
+  <script src="/js/teacher.js" defer></script>
+  <script src="/js/teacher-manage.js" defer></script>
 </body>
 </html>
