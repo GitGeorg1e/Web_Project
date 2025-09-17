@@ -150,6 +150,38 @@ button:disabled, .btn:disabled{ opacity:.55; cursor:not-allowed; }
   max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
+.tabs {
+  display: flex;
+  gap: 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #121a2a; /* ίδιο dark container */
+  margin: 12px 0 20px;
+}
+.tabs a {
+  color: #88b7ff;
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+.tabs a.active {
+  background: #1e2a44;
+  color: #fff;
+}
+
+/* Tabs */
+main .card[id] { display: none; }
+main .card[id].active { display: block; }
+nav.card a.active { font-weight: 600; text-decoration: underline; }
+
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* προαιρετικό: κρύψε ό,τι έχει hidden attribute */
+[hidden] { display: none !important; }
+
+
 /* ------------------------------
    Badges (status)
 ---------------------------------*/

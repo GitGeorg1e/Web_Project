@@ -7,14 +7,21 @@
 
   <link rel="stylesheet" href="/styles.css" />
 
-  <!-- Chart.js (πρόσεχε CSP/Helmet) -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- FilePond (PDF uploader) - πρόσεχε CSP/Helmet -->
+  <!-- FilePond (PDF uploader) -->
   <link rel="stylesheet" href="https://unpkg.com/filepond/dist/filepond.min.css">
   <script src="https://unpkg.com/filepond/dist/filepond.min.js"></script>
   <script src="https://unpkg.com/filepond-plugin-file-validate-type/dist/filepond-plugin-file-validate-type.min.js"></script>
   <script src="https://unpkg.com/filepond-plugin-file-validate-size/dist/filepond-plugin-file-validate-size.min.js"></script>
+
+  <!-- μικρό CSS για tabs (ελάχιστες αλλαγές) -->
+  <style>
+    .tab{display:none}
+    .tab.active{display:block}
+    nav.card a.active{font-weight:600;text-decoration:underline}
+  </style>
 </head>
 <body>
 
@@ -44,7 +51,7 @@
     </nav>
 
     <!-- Δημιουργία / Επεξεργασία Θέματος -->
-    <section id="topics" class="card" aria-labelledby="topics-title">
+    <section id="topics" class="card tab active" aria-labelledby="topics-title">
       <h2 id="topics-title">Θέμα διπλωματικής (Δημιουργία / Επεξεργασία)</h2>
 
       <div class="grid" style="margin-top:8px">
@@ -75,7 +82,7 @@
     </section>
 
     <!-- Ανάθεση θέματος -->
-    <section id="assign" class="card" aria-labelledby="assign-title">
+    <section id="assign" class="card tab" aria-labelledby="assign-title">
       <h2 id="assign-title">Ανάθεση Θέματος</h2>
 
       <div class="grid" style="margin-top:8px">
@@ -111,7 +118,7 @@
     </section>
 
     <!-- Λίστα Θεμάτων -->
-    <section id="my-topics" class="card" aria-labelledby="my-topics-title">
+    <section id="my-topics" class="card tab" aria-labelledby="my-topics-title">
       <h2 id="my-topics-title">Τα θέματα μου</h2>
       <div class="spacer"></div>
       <div style="overflow:auto">
@@ -131,7 +138,7 @@
     </section>
 
     <!-- Αναθέσεις -->
-    <section id="assignments" class="card" aria-labelledby="assignments-title">
+    <section id="assignments" class="card tab" aria-labelledby="assignments-title">
       <h2 id="assignments-title">Αναθέσεις</h2>
       <div class="spacer"></div>
       <div style="overflow:auto">
@@ -155,7 +162,7 @@
     </section>
 
     <!-- Οι διπλωματικές μου -->
-    <section id="theses" class="card" aria-labelledby="theses-title">
+    <section id="theses" class="card tab" aria-labelledby="theses-title">
       <h2 id="theses-title">Οι διπλωματικές μου</h2>
 
       <div class="row" style="gap:8px;align-items:flex-end">
@@ -222,8 +229,8 @@
       </div>
     </section>
 
-    <!-- ΔΙΑΧΕΙΡΙΣΗ ΔΕ (ΝΕΟ) -->
-    <section class="card" id="manage-assignment" aria-labelledby="manage-title">
+    <!-- ΔΙΑΧΕΙΡΙΣΗ ΔΕ -->
+    <section class="card tab" id="manage-assignment" aria-labelledby="manage-title">
       <h2 id="manage-title">Διαχείριση Διπλωματικής</h2>
 
       <div class="row" style="gap:8px;align-items:flex-end">
@@ -283,7 +290,7 @@
     </section>
 
     <!-- Προσκλήσεις Τριμελούς -->
-    <section id="invitations" class="card" aria-labelledby="inv-title">
+    <section id="invitations" class="card tab" aria-labelledby="inv-title">
       <h2 id="inv-title">Προσκλήσεις Τριμελούς</h2>
       <div class="spacer"></div>
       <div style="overflow:auto">
@@ -303,7 +310,7 @@
     </section>
 
     <!-- Στατιστικά -->
-    <section id="stats" class="card" aria-labelledby="stats-title">
+    <section id="stats" class="card tab" aria-labelledby="stats-title">
       <h2 id="stats-title">Στατιστικά</h2>
       <div class="spacer"></div>
       <canvas id="statsChart" width="400" height="160"></canvas>
@@ -312,7 +319,7 @@
     <div class="toast-wrap" aria-live="polite" aria-atomic="true"></div>
   </main>
 
-  <!-- Scripts -->
+  <!-- Υπάρχοντα scripts -->
   <script src="/js/teacher-theses.js" defer></script>
   <script src="/js/teacher.js" defer></script>
   <script src="/js/teacher-manage.js" defer></script>

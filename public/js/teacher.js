@@ -236,8 +236,7 @@ $('assignBtn')?.addEventListener('click', async (e)=>{
   }
 });
 
-
-// προαιρετική ακύρωση ανάθεσης (κρατά IDs όπως στο HTML σου)
+// προαιρετική ακύρωση ανάθεσης
 $('btn-cancel-assignment')?.addEventListener('click', async (e)=>{
   const btn = e.currentTarget;
   const id = Number($('cancel-assignment-id').value.trim());
@@ -340,15 +339,52 @@ async function loadStats(){
 $('exportJson')?.addEventListener('click', e=>{ e.preventDefault(); window.open('/api/teacher/theses/export?format=json','_blank'); });
 $('exportCsv') ?.addEventListener('click', e=>{ e.preventDefault(); window.open('/api/teacher/theses/export?format=csv','_blank'); });
 
+/* ================== Tabs (show/hide + lazy load) ================== */
+const loadedTabs = {};
+function showTab(hash){
+  const links = Array.from(document.querySelectorAll('nav.card a[href^="#"]'));
+  const valid = new Set(links.map(a=>a.getAttribute('href')));
+  const target = valid.has(hash) ? hash : '#topics';
+
+  // toggle active link
+  links.forEach(a => a.classList.toggle('active', a.getAttribute('href')===target));
+
+  // toggle sections
+  const sections = Array.from(document.querySelectorAll('main .card[id]'));
+  sections.forEach(sec => sec.classList.toggle('active', '#'+sec.id === target));
+
+  // lazy load per tab (once)
+  const name = target.slice(1);
+  if (loadedTabs[name]) return;
+  const loaders = {
+    topics:       ()=> loadTopics(),
+    'my-topics':  ()=> loadTopics(),
+    assign:       ()=> {/* μόνο φόρμες */},
+    assignments:  ()=> loadAssignments(),
+    invitations:  ()=> loadInvitations(),
+    stats:        ()=> loadStats(),
+    theses:       ()=> {
+      // Δώσε σήμα στο teacher-theses.js να φορτώσει/εφαρμόσει φίλτρα
+      if (window.teacherTheses && typeof window.teacherTheses.open==='function') window.teacherTheses.open();
+      else if (typeof window.applyThesesFilters==='function') window.applyThesesFilters();
+      else window.dispatchEvent(new CustomEvent('theses:open'));
+    },
+    'manage-assignment': ()=> {/* χειροκίνητα κουμπιά */}
+  };
+  if (loaders[name]) {
+    loaders[name]();
+    loadedTabs[name] = true;
+  }
+}
+
 // ================== bootstrap ==================
 document.addEventListener('DOMContentLoaded', async ()=>{
   try{
     initFilePond();
     await loadMe();
-    await loadTopics();
-    await loadAssignments();
-    await loadInvitations();
-    await loadStats();
+    // αρχική καρτέλα (default: #topics)
+    showTab(location.hash || '#topics');
+    window.addEventListener('hashchange', ()=> showTab(location.hash));
   }catch(e){
     if(String(e.message).toLowerCase().includes('unauthorized')) location.href='/';
   }
