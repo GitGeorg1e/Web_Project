@@ -47,56 +47,43 @@ async function cancelAssignment(req, res) {
     const supervisorId = req.session.user.id;
     const id = Number(req.params.id);
     const { reason } = req.body || {};
-
     if (!id) return res.status(400).json({ message: 'id required' });
 
-    // Βεβαιώσου ότι η ανάθεση ανήκει στον τρέχοντα καθηγητή
     const [[a]] = await pool.query(
       'SELECT id, status, topic_id FROM assignments WHERE id=? AND supervisor_id=?',
       [id, supervisorId]
     );
     if (!a) return res.status(404).json({ message: 'Assignment not found' });
-
-    // Επιτρέπουμε ακύρωση μόνο πριν “οριστικοποιηθεί”
-    if (!['under_assignment', 'active'].includes(a.status)) {
+    if (!['under_assignment','active'].includes(a.status)) {
       return res.status(400).json({ message: 'Cancel allowed only for under_assignment or active' });
     }
 
-    // Μην επιτρέπεις ακύρωση αν υπάρχουν βαθμολογίες
-    const [[g]] = await pool.query(
-      'SELECT COUNT(*) AS c FROM grades WHERE assignment_id=?',
-      [id]
-    );
-    if (g.c > 0) {
-      return res.status(400).json({ message: 'Cannot cancel: grades already exist' });
-    }
+    const [[g]] = await pool.query('SELECT COUNT(*) AS c FROM grades WHERE assignment_id=?', [id]);
+    if (g.c > 0) return res.status(400).json({ message: 'Cannot cancel: grades already exist' });
 
-    // Ακύρωσε την ανάθεση
     await pool.query(
-      'UPDATE assignments SET status="canceled", canceled_at=NOW(), canceled_reason=? WHERE id=?',
+      'UPDATE assignments SET `status`="canceled", canceled_at=NOW(), cancel_reason=? WHERE id=?',
       [reason || 'Canceled by supervisor', id]
     );
 
-    // (Προαιρετικό) Ακύρωσε τυχόν pending προσκλήσεις τριμελούς
-   try {
+    // ακύρωσε pending προσκλήσεις τριμελούς (δεν μπλοκάρει αν αποτύχει)
+    try {
       await pool.query(
         'UPDATE invitations SET status="canceled", responded_at=NOW() WHERE assignment_id=? AND status="pending"',
         [id]
       );
     } catch (e) {
       console.warn('Invitations cancel skipped:', e.sqlMessage || e.message);
-      // δεν κάνουμε throw — δεν θέλουμε να σπάσει η ακύρωση λόγω προσκλήσεων
     }
 
-    // (Προαιρετικό) “Απελευθέρωσε” το θέμα ώστε να ξαναδοθεί (αν το θέλεις)
-     await pool.query('UPDATE topics SET status="free" WHERE id=?', [a.topic_id]);
-
-    res.json({ ok: true });
+    // ⚠️ ΔΕΝ πειράζουμε topics (δεν υπάρχει topics.status)
+    return res.json({ ok: true });
   } catch (e) {
     console.error('cancelAssignment error:', e.sqlMessage || e.message);
     res.status(500).json({ message: 'Server error', detail: e.sqlMessage || e.message });
   }
 }
+
 
 
 async function updateTopic(req, res) {

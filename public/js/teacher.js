@@ -209,6 +209,34 @@ async function loadAssignments(){
   });
 }
 
+$('assignBtn')?.addEventListener('click', async (e)=>{
+  e.preventDefault();
+  const btn = e.currentTarget;
+  const topic_id   = Number($('a_topic')?.value);
+  const student_id = Number($('a_student')?.value);
+  if (!topic_id || !student_id) { alert('Συμπλήρωσε IDs (topic_id & student_id)'); return; }
+
+  try {
+    setLoading(btn, true);
+    const r = await fetch('/api/teacher/assign', {
+      method:'POST',
+      credentials:'same-origin',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body: JSON.stringify({ topic_id, student_id })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data?.message || r.statusText);
+    alert('✅ Η ανάθεση δημιουργήθηκε (#'+data.id+')');
+    $('a_topic').value=''; $('a_student').value='';
+    if (typeof loadAssignments==='function') await loadAssignments();
+  } catch (err) {
+    alert('❌ ' + (err.message || 'Σφάλμα'));
+  } finally {
+    setLoading(btn, false);
+  }
+});
+
+
 // προαιρετική ακύρωση ανάθεσης (κρατά IDs όπως στο HTML σου)
 $('btn-cancel-assignment')?.addEventListener('click', async (e)=>{
   const btn = e.currentTarget;
