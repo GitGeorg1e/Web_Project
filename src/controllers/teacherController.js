@@ -128,16 +128,30 @@ async function updateTopic(req, res) {
 
 async function listAssignments(req, res) {
   const supervisorId = req.session.user.id;
-  const { status, role } = req.query; // role: supervisor | committee
+  const { status } = req.query; // role δεν χρησιμοποιείται εδώ προς το παρόν
+
   let sql = `
-    SELECT a.id, a.status, a.created_at, t.title, u.username AS student
+    SELECT 
+      a.id,
+      a.status,
+      a.created_at,
+      t.title,
+      stu.username AS student,
+      COALESCE(sup.full_name, sup.username) AS supervisor
     FROM assignments a
-    JOIN topics t ON a.topic_id = t.id
-    JOIN users u   ON a.student_id = u.id
-    WHERE a.supervisor_id=?`;
+    JOIN topics t      ON a.topic_id      = t.id
+    JOIN users  stu    ON a.student_id    = stu.id
+    JOIN users  sup    ON a.supervisor_id = sup.id
+    WHERE a.supervisor_id = ?`;
   const params = [supervisorId];
-  if (status) { sql += ' AND a.status = ?'; params.push(status); }
+
+  if (status) { 
+    sql += ' AND a.status = ?';
+    params.push(status);
+  }
+
   sql += ' ORDER BY a.created_at DESC';
+
   const [rows] = await pool.query(sql, params);
   res.json(rows);
 }

@@ -138,28 +138,30 @@
     </section>
 
     <!-- Αναθέσεις -->
-    <section id="assignments" class="card tab" aria-labelledby="assignments-title">
-      <h2 id="assignments-title">Αναθέσεις</h2>
-      <div class="spacer"></div>
-      <div style="overflow:auto">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Φοιτητής</th>
-              <th>Θέμα</th>
-              <th>Κατάσταση</th>
-              <th class="text-right">Ενέργειες</th>
-            </tr>
-          </thead>
-          <tbody id="assignmentsTbody"></tbody>
-        </table>
-      </div>
-      <div class="actions" style="margin-top:10px">
-        <a id="exportJson" href="#">Export JSON</a> •
-        <a id="exportCsv" href="#">Export CSV</a>
-      </div>
-    </section>
+<section id="assignments" class="card tab" aria-labelledby="assignments-title">
+  <h2 id="assignments-title">Αναθέσεις</h2>
+  <div class="spacer"></div>
+  <div style="overflow:auto">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Φοιτητής</th>
+          <th>Θέμα</th>
+          <th>Επιβλέπων</th> <!-- ΝΕΑ ΣΤΗΛΗ -->
+          <th>Κατάσταση</th>
+          <th class="text-right">Ενέργειες</th>
+        </tr>
+      </thead>
+      <tbody id="assignmentsTbody"></tbody>
+    </table>
+  </div>
+  <div class="actions" style="margin-top:10px">
+    <a id="exportJson" href="#">Export JSON</a> •
+    <a id="exportCsv" href="#">Export CSV</a>
+  </div>
+</section>
+
 
     <!-- Οι διπλωματικές μου -->
     <section id="theses" class="card tab" aria-labelledby="theses-title">

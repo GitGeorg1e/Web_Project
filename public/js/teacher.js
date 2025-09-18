@@ -173,6 +173,7 @@ async function loadAssignments(){
     tr.appendChild(td(r.id));
     tr.appendChild(td(esc(r.student)));
     tr.appendChild(td(esc(r.title)));
+    tr.appendChild(td(esc(r.supervisor || '—'))); 
 
     const st = document.createElement('td');
     const badge = document.createElement('span');
