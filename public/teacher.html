@@ -16,12 +16,8 @@
   <script src="https://unpkg.com/filepond-plugin-file-validate-type/dist/filepond-plugin-file-validate-type.min.js"></script>
   <script src="https://unpkg.com/filepond-plugin-file-validate-size/dist/filepond-plugin-file-validate-size.min.js"></script>
 
-  <!-- μικρό CSS για tabs (ελάχιστες αλλαγές) -->
-  <style>
-    .tab{display:none}
-    .tab.active{display:block}
-    nav.card a.active{font-weight:600;text-decoration:underline}
-  </style>
+ 
+  
 </head>
 <body>
 
@@ -138,30 +134,29 @@
     </section>
 
     <!-- Αναθέσεις -->
-<section id="assignments" class="card tab" aria-labelledby="assignments-title">
-  <h2 id="assignments-title">Αναθέσεις</h2>
-  <div class="spacer"></div>
-  <div style="overflow:auto">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Φοιτητής</th>
-          <th>Θέμα</th>
-          <th>Επιβλέπων</th> <!-- ΝΕΑ ΣΤΗΛΗ -->
-          <th>Κατάσταση</th>
-          <th class="text-right">Ενέργειες</th>
-        </tr>
-      </thead>
-      <tbody id="assignmentsTbody"></tbody>
-    </table>
-  </div>
-  <div class="actions" style="margin-top:10px">
-    <a id="exportJson" href="#">Export JSON</a> •
-    <a id="exportCsv" href="#">Export CSV</a>
-  </div>
-</section>
-
+    <section id="assignments" class="card tab" aria-labelledby="assignments-title">
+      <h2 id="assignments-title">Αναθέσεις</h2>
+      <div class="spacer"></div>
+      <div style="overflow:auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Φοιτητής</th>
+              <th>Θέμα</th>
+              <th>Επιβλέπων</th>
+              <th>Κατάσταση</th>
+              <th class="text-right">Ενέργειες</th>
+            </tr>
+          </thead>
+          <tbody id="assignmentsTbody"></tbody>
+        </table>
+      </div>
+      <div class="actions" style="margin-top:10px">
+        <a id="exportJson" href="#">Export JSON</a> •
+        <a id="exportCsv"  href="#">Export CSV</a>
+      </div>
+    </section>
 
     <!-- Οι διπλωματικές μου -->
     <section id="theses" class="card tab" aria-labelledby="theses-title">
@@ -229,6 +224,15 @@
           </table>
         </div>
       </div>
+
+      <!-- ΝΕΟ: κουμπιά export για το tab «Οι διπλωματικές μου» -->
+      <div class="actions" style="margin-top:10px">
+        <a id="thesesExportJson" href="#">Export JSON</a> •
+        <a id="thesesExportCsv"  href="#">Export CSV</a>
+      </div>
+
+      <!-- ΝΕΟ: container για λεπτομέρειες/χρονολόγιο μιας διπλωματικής (θα γεμίζει από JS) -->
+      <div id="thesisDetails" class="card" style="margin-top:12px; display:none"></div>
     </section>
 
     <!-- ΔΙΑΧΕΙΡΙΣΗ ΔΕ -->
@@ -289,7 +293,6 @@
       </details>
 
       <pre id="m-output"></pre>
-
     </section>
 
     <!-- Προσκλήσεις Τριμελούς -->

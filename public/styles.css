@@ -97,6 +97,24 @@ input:focus, textarea:focus, select:focus{
   box-shadow: 0 0 0 3px var(--ring);
 }
 
+/* Tabs */
+
+    .tab{display:none}
+    .tab.active{display:block}
+    nav.card a.active{font-weight:600;text-decoration:underline}
+
+    /* για το output της Διαχείρισης ΔΕ */
+    #m-output{
+      background:#111a27;      /* ταιριάζει με το theme */
+      color:#e6eef8;
+      border:1px solid #2a3546;
+      border-radius:8px;
+      padding:10px;
+      min-height:120px;
+      white-space:pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
 /* ------------------------------
    Buttons
 ---------------------------------*/

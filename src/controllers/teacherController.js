@@ -352,23 +352,95 @@ async function stats(req, res) {
 async function exportTheses(req, res) {
   const teacherId = req.session.user.id;
   const format = (req.query.format || 'json').toLowerCase(); // json | csv
-  const [rows] = await pool.query(`
-    SELECT a.id, t.title, a.status, u.username AS student, a.created_at
+  const role   = (req.query.role || '').trim();              // '', 'supervisor', 'committee'
+  const status = (req.query.status || '').trim();            // '', 'active', ...
+
+  // Βάσεις ίδιες με listMyTheses
+  const baseSupervisorSQL = `
+    SELECT a.id AS assignment_id, 'supervisor' AS role, a.status AS assignment_status,
+           t.title, s.full_name AS student_name, s.username AS student_username,
+           a.created_at, a.finalized_at,
+           NULL AS committee_status, NULL AS invited_at, NULL AS responded_at
     FROM assignments a
-    JOIN topics t ON a.topic_id=t.id
-    JOIN users u ON a.student_id=u.id
-    WHERE a.supervisor_id=?
-    ORDER BY a.created_at DESC`, [teacherId]);
+    JOIN topics t ON t.id = a.topic_id
+    JOIN users  s ON s.id = a.student_id
+    WHERE a.supervisor_id = ?
+  `;
+
+  const baseCommitteeSQL = `
+    SELECT a.id AS assignment_id, 'committee' AS role, a.status AS assignment_status,
+           t.title, s.full_name AS student_name, s.username AS student_username,
+           a.created_at, a.finalized_at,
+           i.status AS committee_status, i.invited_at, i.responded_at
+    FROM invitations i
+    JOIN assignments a ON a.id = i.assignment_id
+    JOIN topics t      ON t.id = a.topic_id
+    JOIN users  s      ON s.id = a.student_id
+    WHERE i.invitee_id = ?
+  `;
+
+  const statusFilter = status ? ' AND a.status = ?' : '';
+  const paramsSup = [teacherId];
+  const paramsCom = [teacherId];
+  if (status) { paramsSup.push(status); paramsCom.push(status); }
+
+  let sql, params;
+  if (role === 'supervisor') {
+    sql = `${baseSupervisorSQL}${statusFilter} ORDER BY created_at DESC`;
+    params = paramsSup;
+  } else if (role === 'committee') {
+    sql = `${baseCommitteeSQL}${statusFilter} ORDER BY invited_at DESC, created_at DESC`;
+    params = paramsCom;
+  } else {
+    sql = `
+      (${baseSupervisorSQL}${statusFilter})
+      UNION ALL
+      (${baseCommitteeSQL}${statusFilter})
+      ORDER BY created_at DESC
+    `;
+    params = [...paramsSup, ...paramsCom];
+  }
+
+  const [rows] = await pool.query(sql, params);
+  const items = rows.map(r => ({
+    assignment_id: r.assignment_id,
+    role: r.role,
+    status: r.assignment_status,
+    title: r.title,
+    student: r.student_name || r.student_username,
+    created_at: r.created_at,
+    finalized_at: r.finalized_at,
+    committee_status: r.committee_status,
+    invited_at: r.invited_at,
+    responded_at: r.responded_at
+  }));
 
   if (format === 'csv') {
-    const header = 'id,title,status,student,created_at';
-    const body = rows.map(r => [r.id, r.title, r.status, r.student, r.created_at.toISOString()].join(',')).join('\n');
-    res.setHeader('Content-Type','text/csv');
-    res.setHeader('Content-Disposition','attachment; filename="theses.csv"');
+    const header = [
+      'assignment_id','role','status','title','student',
+      'created_at','finalized_at','committee_status','invited_at','responded_at'
+    ].join(',');
+    const body = items.map(r=>[
+      r.assignment_id,
+      r.role,
+      r.status,
+      (r.title||'').replaceAll('"','""'),
+      (r.student||'').replaceAll('"','""'),
+      r.created_at ? new Date(r.created_at).toISOString() : '',
+      r.finalized_at ? new Date(r.finalized_at).toISOString() : '',
+      r.committee_status || '',
+      r.invited_at ? new Date(r.invited_at).toISOString() : '',
+      r.responded_at ? new Date(r.responded_at).toISOString() : ''
+    ].map(v => `"${v}"`).join(',')).join('\n');
+
+    res.setHeader('Content-Type','text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition','attachment; filename="my_theses.csv"');
     return res.send(`${header}\n${body}`);
   }
-  res.json(rows);
+
+  res.json(items);
 }
+
 
 // --- under_assignment -> active
 async function confirmAssignment(req, res) {
@@ -450,53 +522,77 @@ async function listInvitationsForAssignment(req,res){
   }catch(e){ res.status(e.status||500).json({message:e.message||'Server error'}); }
 }
 
-async function cancelAssignment2(req,res){;
-  try{
-    const teacherId=req.session.user.id;
-    const id=Number(req.params.id);
-    const { council_number, council_year } = req.body || {};
-    const asg = await assertSupervisor(teacherId,id);
+async function cancelAssignment2(req, res) {
+  const teacherId = req.session.user.id;
+  const id = Number(req.params.id);
+  const { council_number, council_year } = req.body || {}; // θα τα γράψουμε στα ap_gs_*
 
+  if (!id) return res.status(400).json({ message: 'id required' });
+
+  const conn = await pool.getConnection();
+  try {
     await conn.beginTransaction();
 
+    const [[asg]] = await conn.query(
+      'SELECT id, status, finalized_at FROM assignments WHERE id=? AND supervisor_id=? FOR UPDATE',
+      [id, teacherId]
+    );
+    if (!asg) { await conn.rollback(); return res.status(404).json({ message:'Assignment not found' }); }
+
+    // 1) Υπό ανάθεση: απλή ακύρωση & ακύρωση pending invitations
     if (asg.status === 'under_assignment') {
       await conn.query(
         `UPDATE assignments
-            SET status='canceled', canceled_at=NOW(), canceled_reason='Canceled by supervisor (under_assignment)'
-          WHERE id=?`, [id]);
+            SET status='canceled', canceled_at=NOW(), cancel_reason='Canceled by supervisor (under_assignment)'
+          WHERE id=?`, [id]
+      );
       await conn.query(
         `UPDATE invitations
             SET status='canceled', responded_at=NOW()
-          WHERE assignment_id=? AND status='pending'`, [id]);
+          WHERE assignment_id=? AND status='pending'`, [id]
+      );
       await conn.commit();
       return res.json({ ok:true });
     }
 
+    // 2) Ενεργή: απαιτείται finalized_at >= 2 έτη & Γ.Σ. (number/year)
     if (asg.status === 'active') {
-      if (!asg.finalized_at) { await conn.rollback(); return res.status(400).json({message:'No finalized_at set'}); }
-      const [[{diff_days}]] = await conn.query('SELECT TIMESTAMPDIFF(DAY, ?, NOW()) AS diff_days',[asg.finalized_at]);
-      if (diff_days < 365*2) { await conn.rollback(); return res.status(400).json({message:'Needs 2 years after finalized_at'}); }
-      if (!council_number || !council_year) { await conn.rollback(); return res.status(400).json({message:'council_number & council_year required'}); }
+      if (!asg.finalized_at) { await conn.rollback(); return res.status(400).json({ message:'No finalized_at set' }); }
+      const [[{ diff_days }]] = await conn.query(
+        'SELECT TIMESTAMPDIFF(DAY, ?, NOW()) AS diff_days', [asg.finalized_at]
+      );
+      if (diff_days < 365 * 2) { await conn.rollback(); return res.status(400).json({ message:'Needs 2 years after finalized_at' }); }
+      if (!council_number || !council_year) { await conn.rollback(); return res.status(400).json({ message:'council_number & council_year required' }); }
 
       await conn.query(
         `UPDATE assignments
-            SET status='canceled', canceled_at=NOW(),
-                canceled_reason='Canceled by supervisor', council_number=?, council_year=?
-          WHERE id=?`, [council_number, council_year, id]);
+            SET status='canceled',
+                canceled_at=NOW(),
+                cancel_reason='Canceled by supervisor',
+                ap_gs_number=?,
+                ap_gs_year=?
+          WHERE id=?`,
+        [String(council_number), Number(council_year), id]
+      );
       await conn.query(
         `UPDATE invitations
             SET status='canceled', responded_at=NOW()
-          WHERE assignment_id=? AND status='pending'`, [id]);
+          WHERE assignment_id=? AND status='pending'`, [id]
+      );
+
       await conn.commit();
       return res.json({ ok:true });
     }
 
     await conn.rollback();
-    res.status(400).json({message:'Cancel allowed only for under_assignment or active'});
-  }catch(e){
+    res.status(400).json({ message:'Cancel allowed only for under_assignment or active' });
+  } catch (e) {
     await conn.rollback();
-    res.status(500).json({message:'Server error'});
-  }finally{ conn.release(); }
+    console.error('cancelAssignment2 error:', e.sqlMessage || e.message);
+    res.status(500).json({ message:'Server error', detail: e.sqlMessage || e.message });
+  } finally {
+    conn.release();
+  }
 }
 
 /* ---------- Ενεργή ---------- */
@@ -506,22 +602,26 @@ async function listNotes(req,res){
     const id=Number(req.params.id);
     await assertParticipant(teacherId,id);
     const [rows]=await pool.query(
-      'SELECT id, body, created_at FROM teacher_notes WHERE assignment_id=? AND author_id=? ORDER BY created_at DESC',
-      [id, teacherId]);
+      'SELECT id, text, created_at FROM notes WHERE assignment_id=? AND author_id=? ORDER BY created_at DESC',
+      [id, teacherId]
+    );
     res.json(rows);
   }catch(e){ res.status(e.status||500).json({message:e.message||'Server error'}); }
 }
+
 async function addNote(req,res){
   try{
     const teacherId=req.session.user.id;
     const id=Number(req.params.id);
-    const { body } = req.body||{};
-    if (!body || body.length>300) return res.status(400).json({message:'Note 1..300 chars'});
+    const { body } = req.body||{}; // από το UI έρχεται ως "body"
+    const text = (body||'').trim();
+    if (!text || text.length>300) return res.status(400).json({message:'Note 1..300 chars'});
     await assertParticipant(teacherId,id);
-    await pool.query('INSERT INTO teacher_notes (assignment_id, author_id, body) VALUES (?,?,?)',[id,teacherId,body]);
+    await pool.query('INSERT INTO notes (assignment_id, author_id, text) VALUES (?,?,?)',[id,teacherId,text]);
     res.status(201).json({ok:true});
   }catch(e){ res.status(e.status||500).json({message:e.message||'Server error'}); }
 }
+
 async function moveToUnderReview(req,res){
   try{
     const teacherId=req.session.user.id;
@@ -589,32 +689,124 @@ async function submitGrade(req,res){
     const [[{grading_enabled}]] = await pool.query('SELECT grading_enabled FROM assignments WHERE id=?',[id]);
     if (!grading_enabled) return res.status(400).json({message:'Grading not enabled by supervisor'});
     if (total==null) return res.status(400).json({message:'total required'});
+
     await pool.query(`
-      INSERT INTO grades (assignment_id, grader_id, total, created_at, criteria_json)
+      INSERT INTO grades (assignment_id, grader_id, total, created_at, criteria)
       VALUES (?, ?, ?, NOW(), ?)
-      ON DUPLICATE KEY UPDATE total=VALUES(total), criteria_json=VALUES(criteria_json), created_at=NOW()
+      ON DUPLICATE KEY UPDATE total=VALUES(total), criteria=VALUES(criteria), created_at=NOW()
     `,[id,teacherId,Number(total), criteria?JSON.stringify(criteria):null]);
+
     res.status(201).json({ok:true});
   }catch(e){ res.status(e.status||500).json({message:e.message||'Server error'}); }
 }
+
 async function listGrades(req,res){
   try{
     const teacherId=req.session.user.id;
     const id=Number(req.params.id);
     await assertParticipant(teacherId,id);
     const [rows]=await pool.query(`
-      SELECT g.grader_id, u.full_name AS grader_name, g.total, g.created_at, g.criteria_json
+      SELECT g.grader_id, u.full_name AS grader_name, g.total, g.created_at, g.criteria
       FROM grades g JOIN users u ON u.id=g.grader_id
       WHERE g.assignment_id=?`,[id]);
+
     res.json(rows.map(r=>({
       grader_id:r.grader_id,
       grader_name:r.grader_name,
       total:Number(r.total),
       created_at:r.created_at,
-      criteria:r.criteria_json?JSON.parse(r.criteria_json):null
+      criteria:r.criteria?JSON.parse(r.criteria):null
     })));
   }catch(e){ res.status(e.status||500).json({message:e.message||'Server error'}); }
 }
+// --- λεπτομέρειες μιας ΔΕ (για tab "Οι διπλωματικές μου")
+async function getThesisDetails(req, res) {
+  try {
+    const teacherId = req.session.user.id;
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ message: 'id required' });
+
+    // Επιτρέπουμε πρόσβαση αν είναι επιβλέπων ή μέλος τριμελούς
+    const [[a]] = await pool.query(`
+      SELECT 
+        a.id, a.topic_id, a.student_id, a.supervisor_id, a.status,
+        a.created_at, a.activated_at, a.under_review_at, a.completed_at, a.canceled_at, a.finalized_at,
+        t.title,
+        s.username AS student_username, s.full_name AS student_name, s.email AS student_email,
+        sup.username AS supervisor_username, sup.full_name AS supervisor_name,
+        /* πεδία που μπορεί να υπάρχουν στο schema σου */
+        a.draft_url, a.extra_links_json,
+        a.exam_datetime, a.exam_mode, a.exam_room, a.meeting_url,
+        a.repository_url
+      FROM assignments a
+      JOIN topics t ON t.id = a.topic_id
+      JOIN users  s ON s.id = a.student_id
+      JOIN users  sup ON sup.id = a.supervisor_id
+      WHERE a.id = ?
+        AND (a.supervisor_id = ? OR EXISTS (
+              SELECT 1 FROM invitations i 
+              WHERE i.assignment_id = a.id AND i.invitee_id = ?
+            ))
+    `, [id, teacherId, teacherId]);
+
+    if (!a) return res.status(404).json({ message: 'Assignment not found' });
+
+    // Τριμελής
+    const [committee] = await pool.query(`
+      SELECT u.id, COALESCE(u.full_name, u.username) AS name,
+             i.status, i.invited_at, i.responded_at
+      FROM invitations i
+      JOIN users u ON u.id = i.invitee_id
+      WHERE i.assignment_id = ?
+      ORDER BY i.invited_at ASC
+    `, [id]);
+
+    // Τελικός βαθμός (μ.ο. από πίνακα grades)
+    const [[g]] = await pool.query(
+      `SELECT AVG(total) AS final_grade, COUNT(*) AS graders
+         FROM grades WHERE assignment_id = ?`, [id]);
+    const final_grade = g?.final_grade != null ? Number(g.final_grade) : null;
+
+    // timeline από timestamps
+    const timeline = [];
+    if (a.created_at)      timeline.push({ event: 'created',       at: a.created_at });
+    if (a.activated_at)    timeline.push({ event: 'active',        at: a.activated_at });
+    if (a.under_review_at) timeline.push({ event: 'under_review',  at: a.under_review_at });
+    if (a.completed_at)    timeline.push({ event: 'completed',     at: a.completed_at });
+    if (a.canceled_at)     timeline.push({ event: 'canceled',      at: a.canceled_at });
+
+    // extra links
+    let links = [];
+    try { if (a.extra_links_json) links = JSON.parse(a.extra_links_json); } catch {}
+
+    res.json({
+      id: a.id,
+      title: a.title,
+      status: a.status,
+      role: a.supervisor_id === teacherId ? 'supervisor' : 'committee',
+      student: { name: a.student_name || a.student_username, username: a.student_username, email: a.student_email },
+      supervisor: { name: a.supervisor_name || a.supervisor_username, username: a.supervisor_username },
+      committee,
+      timeline,
+      final_grade,
+      graders: g?.graders || 0,
+      draft_url: a.draft_url || null,
+      links,
+      exam: {
+        datetime: a.exam_datetime || null,
+        mode: a.exam_mode || null,
+        room: a.exam_room || null,
+        meeting_url: a.meeting_url || null
+      },
+      repository_url: a.repository_url || null,
+      report_url: `/api/student/assignment/${a.id}/report`
+    });
+  } catch (e) {
+    console.error('getThesisDetails error:', e.sqlMessage || e.message);
+    res.status(500).json({ message: 'Server error', detail: e.sqlMessage || e.message });
+  }
+}
+
 
 
 
@@ -626,6 +818,6 @@ module.exports = {
   cancelAssignment2,
   listNotes, addNote, moveToUnderReview,
   getDraft, buildAnnouncement,
-  enableGrading, submitGrade, listGrades,
+  enableGrading, submitGrade, listGrades,  getThesisDetails
   
 };
