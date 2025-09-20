@@ -33,24 +33,117 @@ $('logout')?.addEventListener('click', async () => {
 });
 
 // ------- Load thesis (και prefill assignment ids)
+// ------- Load thesis (rich overview με περιγραφή, PDF, επιτροπή, ημέρες) -------
 async function loadThesis() {
+  const box = $('thesis');
+  if (!box) return;
+  box.textContent = 'Φόρτωση…';
+
+  // 1) Φέρνουμε τα δεδομένα από /api/student/thesis, με fallback σε /api/student/my-thesis
+  let d = null;
   try {
-    const data = await fetchJSON('/api/student/thesis');
-    const box = $('thesis');
-    if (!data) { box.textContent = 'Δεν βρέθηκε ανάθεση.'; return; }
-    box.innerHTML = `
-      <div><strong>Θέμα:</strong> ${data.title}</div>
-      <div><strong>Κατάσταση:</strong> ${data.status}</div>
-      <div><strong>Ανάθεση:</strong> #${data.id} — ${new Date(data.created_at).toLocaleString()}</div>
-    `;
-    // Prefill assignment id fields
-    ['invite-assignment-id','draft-assignment-id','exam-assignment-id','repo-assignment-id','report-assignment-id']
-      .forEach(id => { const el = $(id); if (el && !el.value) el.value = data.id; });
-    await loadCommittee(); // να φαίνεται άμεσα
-  } catch (e) {
-    $('thesis').textContent = e.message || 'Σφάλμα';
+    d = await fetchJSON('/api/student/thesis');
+  } catch (_e1) {
+    try {
+      d = await fetchJSON('/api/student/my-thesis');
+    } catch (e2) {
+      box.textContent = e2.message || 'Σφάλμα';
+      return;
+    }
   }
+
+  if (!d) {
+    box.innerHTML = '<span class="muted">Δεν βρέθηκε ανάθεση.</span>';
+    return;
+  }
+
+  // 2) Υπολογισμός ημερών από επίσημη ανάθεση
+  let days = null;
+  if (typeof d.days_since_official_assignment === 'number') {
+    days = d.days_since_official_assignment;
+  } else if (d.activated_at) {
+    const diffMs = Date.now() - new Date(d.activated_at).getTime();
+    days = Math.max(0, Math.floor(diffMs / (24 * 60 * 60 * 1000)));
+  }
+
+  // 3) Κατασκευή markup
+  const wrap = document.createElement('div');
+  wrap.style.display = 'grid';
+  wrap.style.gap = '8px';
+
+  const row = (label, value, asLink=false) => {
+    const div = document.createElement('div');
+    const b = document.createElement('strong');
+    b.textContent = label + ': ';
+    div.appendChild(b);
+
+    if (asLink && value) {
+      const a = document.createElement('a');
+      a.href = value; a.textContent = 'Άνοιγμα'; a.target = '_blank'; a.rel = 'noopener';
+      div.appendChild(a);
+    } else {
+      div.appendChild(document.createTextNode(String(value ?? '—')));
+    }
+    return div;
+  };
+
+  wrap.appendChild(row('Θέμα', d.title));
+  wrap.appendChild(row('Περιγραφή', d.description));
+  // υποθέτουμε ότι το backend δίνει topics.pdf_path ως topic_pdf
+  wrap.appendChild(row('PDF Περιγραφής', d.topic_pdf || '—', !!d.topic_pdf));
+  wrap.appendChild(row('Κατάσταση', d.status));
+  wrap.appendChild(row('Ημέρες από επίσημη ανάθεση', days == null ? '—' : String(days)));
+
+  // 4) Επιτροπή: αν δεν έχει έρθει μαζί, τη φέρνουμε
+  const committeeBox = document.createElement('div');
+  const h3 = document.createElement('h3');
+  h3.textContent = 'Τριμελής Επιτροπή';
+  h3.style.margin = '8px 0 0';
+  committeeBox.appendChild(h3);
+
+  const ul = document.createElement('ul');
+  ul.style.listStyle = 'none';
+  ul.style.padding = '0';
+  committeeBox.appendChild(ul);
+
+  // helper για να γεμίσουμε τη λίστα επιτροπής
+  const renderCommittee = (rows) => {
+    ul.innerHTML = '';
+    if (Array.isArray(rows) && rows.length) {
+      rows.forEach(m => {
+        const li = document.createElement('li');
+        li.textContent = `${m.full_name || m.username} — ${m.status}`;
+        ul.appendChild(li);
+      });
+    } else {
+      const li = document.createElement('li'); li.textContent = '—';
+      ul.appendChild(li);
+    }
+  };
+
+  if (Array.isArray(d.committee)) {
+    // ήρθε έτοιμη από το API
+    renderCommittee(d.committee);
+  } else {
+    // αλλιώς φέρνουμε από το ήδη υπάρχον endpoint σου της επιτροπής
+    try {
+      const rows = await fetchJSON('/api/student/committee?assignment_id=' + encodeURIComponent(d.id));
+      renderCommittee(rows);
+    } catch {
+      renderCommittee([]);
+    }
+  }
+
+  wrap.appendChild(committeeBox);
+
+  // 5) Απόδοση + προ-γέμισμα IDs (κρατάω όπως το είχες)
+  box.innerHTML = '';
+  box.appendChild(wrap);
+
+  ['invite-assignment-id','draft-assignment-id','exam-assignment-id','repo-assignment-id','report-assignment-id']
+    .forEach(id => { const el = $(id); if (el && !el.value) el.value = d.id; });
 }
+
 
 // ------- Προφίλ
 const profileForm = document.getElementById('profile-form');

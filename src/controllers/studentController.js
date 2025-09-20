@@ -5,18 +5,62 @@ const { pool } = require('../config/db');
 
 
 // ───── ΥΠΑΡΧΟΝΤΑ ΔΙΚΑ ΣΟΥ ─────
+// Επιστρέφει την πιο πρόσφατη ΔΕ του φοιτητή με "πλούσια" στοιχεία
 async function myThesis(req, res) {
   const studentId = req.session.user.id;
-  const [[row]] = await pool.query(`
-    SELECT a.id, a.status, t.title, t.description, a.created_at
-    FROM assignments a
 
-    JOIN topics t ON a.topic_id=t.id
-    WHERE a.student_id=?
-    ORDER BY a.created_at DESC LIMIT 1
-  `,[studentId]);
-  res.json(row || null);
+  // Κεφαλίδα ΔΕ (θέμα/περιγραφή/pdf/κατάσταση + χρόνος από επίσημη ανάθεση)
+  const [[head]] = await pool.query(`
+    SELECT
+      a.id,
+      a.status,
+      a.created_at,
+      a.activated_at,
+      t.title,
+      t.description,
+      t.pdf_path AS topic_pdf,
+      CASE
+        WHEN a.created_at IS NOT NULL
+          THEN TIMESTAMPDIFF(DAY, a.created_at, NOW())
+        ELSE NULL
+      END AS days_since_official_assignment
+    FROM assignments a
+    JOIN topics t ON t.id = a.topic_id
+    WHERE a.student_id = ?
+    ORDER BY a.created_at DESC
+    LIMIT 1
+  `, [studentId]);
+
+  if (!head) return res.json(null);
+
+  // Μέλη τριμελούς (αν έχουν οριστεί)
+  const [committee] = await pool.query(`
+    SELECT
+      u.id,
+      u.full_name,
+      u.username,
+      u.email,
+      i.status
+    FROM invitations i
+    JOIN users u ON u.id = i.invitee_id
+    WHERE i.assignment_id = ?
+    ORDER BY (i.status='accepted') DESC, i.invited_at ASC
+  `, [head.id]);
+
+  // Τελική απόκριση
+  res.json({
+    id: head.id,
+    status: head.status,
+    title: head.title,
+    description: head.description,
+    topic_pdf: head.topic_pdf, // π.χ. "/uploads/topic_pdfs/....pdf" (αν υπάρχει)
+    created_at: head.created_at,
+    activated_at: head.activated_at,
+    days_since_official_assignment: head.days_since_official_assignment, // null αν δεν έχει γίνει επίσημη ανάθεση
+    committee, // [] αν δεν έχουν οριστεί
+  });
 }
+
 
 async function updateProfile(req, res) {
   try {
