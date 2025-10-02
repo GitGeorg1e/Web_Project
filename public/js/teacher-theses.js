@@ -108,10 +108,10 @@
         card2.appendChild(pRepo);
       }
       if (d.report_url) {
-        const pRep = el('p');
+      const pRep = el('p');
         pRep.appendChild(el('strong', { text: 'Πρακτικό: ' }));
         pRep.appendChild(el('a', { href: d.report_url, target: '_blank', rel: 'noopener', text: 'Άνοιγμα' }));
-        card2.appendChild(pRep);
+       card2.appendChild(pRep);
       }
 
       if (d.draft_url) {

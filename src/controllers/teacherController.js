@@ -305,7 +305,10 @@ async function respondInvitation(req, res) {
         // ενεργοποίηση ανάθεσης αν ήταν under_assignment
         await conn.query(
           `UPDATE assignments
-              SET status='active'
+              SET status='active',
+               activated_at = COALESCE(activated_at, NOW()),
+               finalized_at = COALESCE(finalized_at, NOW())
+
             WHERE id=? AND status='under_assignment'`,
           [inv.assignment_id]
         );
@@ -449,7 +452,7 @@ async function confirmAssignment(req, res) {
     const { id } = req.params;
 
     const [r] = await pool.query(
-      'UPDATE assignments SET status="active" WHERE id=? AND supervisor_id=? AND status="under_assignment"',
+      'UPDATE assignments SET status="active", activated_at = COALESCE(activated_at, NOW()), finalized_at = COALESCE(finalized_at, NOW())  WHERE id=? AND supervisor_id=? AND status="under_assignment"',
       [id, supervisorId]
     );
 
@@ -656,19 +659,37 @@ async function buildAnnouncement(req,res){
       JOIN topics t ON t.id=a.topic_id
       JOIN users  u ON u.id=a.student_id
       WHERE a.id=?`, [id]);
+
     if (!row?.exam_datetime) return res.status(400).json({message:'Exam details are missing'});
-    const when = new Date(row.exam_datetime).toLocaleString();
-    const where = row.exam_mode==='in_person' ? `Αίθουσα: ${row.exam_room||'—'}` : `Σύνδεσμος: ${row.meeting_url||'—'}`;
+
+    const when = new Date(row.exam_datetime).toLocaleString('el-GR', { dateStyle:'full', timeStyle:'short', hour12:false });
+    const inPerson = row.exam_mode === 'in_person';
+    const modeLabel = inPerson ? 'Δια ζώσης' : 'Διαδικτυακά';
+    const placeLabel = inPerson ? 'Αίθουσα' : 'Σύνδεσμος';
+    const placeValue = inPerson ? (row.exam_room || '—') : (row.meeting_url || '—');
+
     const html = `
-      <h3>Παρουσίαση Διπλωματικής</h3>
-      <p><strong>Θέμα:</strong> ${row.title}</p>
-      <p><strong>Φοιτητής:</strong> ${row.student_name || row.student_username}</p>
-      <p><strong>Ημερομηνία/Ώρα:</strong> ${when}</p>
-      <p><strong>Τρόπος:</strong> ${row.exam_mode || '—'} — ${where}</p>
+      <div class="container">
+        <article class="card">
+          <h2>Παρουσίαση Διπλωματικής</h2>
+          <p><span class="muted">Θέμα</span><br><strong>${row.title}</strong></p>
+          <p><span class="muted">Φοιτητής</span><br>${row.student_name || row.student_username}</p>
+          <p><span class="muted">Ημερομηνία/Ώρα</span><br>${when}</p>
+          <p><span class="muted">Τρόπος</span><br>
+            <span class="badge">${modeLabel}</span>
+            &nbsp;—&nbsp;<strong>${placeLabel}:</strong> ${placeValue}
+          </p>
+        </article>
+      </div>
     `.trim();
-    res.set('Content-Type','text/html; charset=utf-8'); res.send(html);
-  }catch(e){ res.status(e.status||500).json({message:e.message||'Server error'}); }
+
+    res.set('Content-Type','text/html; charset=utf-8');
+    res.send(html);
+  }catch(e){
+    res.status(e.status||500).json({message:e.message||'Server error'});
+  }
 }
+
 async function enableGrading(req,res){
   try{
     const teacherId=req.session.user.id;

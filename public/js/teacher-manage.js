@@ -118,7 +118,7 @@ $m('m-submit-grade').onclick = async () => {
     const total = Number($m('m-grade-total').value);
     if (Number.isNaN(total)) return out('Δώσε συνολικό βαθμό (0..10).');
     let criteria = null;
-    const raw = ($m('m-grade-criteria').value || '').trim();
+    const raw = ($m('criteria_json').value || '').trim();
     if (raw) { try { criteria = JSON.parse(raw); } catch { return out('Λάθος JSON στα κριτήρια.'); } }
     const data = await jpost(`/api/teacher/assignments/${id}/grades`, { total, criteria });
     out(data);

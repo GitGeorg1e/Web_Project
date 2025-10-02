@@ -1,5 +1,6 @@
 // src/controllers/secretariatController.js
 const { pool } = require('../config/db');
+const bcrypt = require('bcryptjs'); // αντί για bcrypt
 
 // Λίστα ΔΕ που είναι Ενεργές ή Υπό Εξέταση
 async function listActiveAndUnderReview(req, res) {
@@ -153,7 +154,7 @@ async function setGsApproval(req, res) {
     }
 
     await pool.query(
-      'UPDATE assignments SET gs_approval_number=?, gs_approval_year=? WHERE id=?',
+      'UPDATE assignments SET ap_gs_number=?, ap_gs_year=? WHERE id=?',
       [String(number), Number(year), id]
     );
     res.json({ ok: true });
@@ -169,10 +170,10 @@ async function setGsApproval(req, res) {
 async function cancelAssignment(req, res) {
   try {
     const id = Number(req.params.id);
-    const { gs_number, gs_year, reason } = req.body || {};
-    if (!id || !gs_number || !gs_year) {
-      return res.status(400).json({ message: 'gs_number & gs_year required' });
-    }
+    const { reason } = req.body || {};
+
+    // ΜΟΝΟ id απαιτείται
+    if (!id) return res.status(400).json({ message: 'id required' });
 
     const [[a]] = await pool.query('SELECT status FROM assignments WHERE id=?', [id]);
     if (!a) return res.status(404).json({ message: 'Not found' });
@@ -180,15 +181,14 @@ async function cancelAssignment(req, res) {
       return res.status(400).json({ message: 'Allowed only when status=active' });
     }
 
+    // ΔΙΟΡΘΩΣΗ: 2 placeholders ⇢ 2 τιμές
     await pool.query(`
       UPDATE assignments
       SET status='canceled',
           canceled_at=NOW(),
-          canceled_gs_number=?,
-          canceled_gs_year=?,
-          canceled_reason=?
+          cancel_reason=?
       WHERE id=?`,
-      [String(gs_number), Number(gs_year), reason || 'κατόπιν αίτησης Φοιτητή/τριας', id]
+      [reason || 'κατόπιν αίτησης Φοιτητή/τριας', id]
     );
 
     res.json({ ok: true });
@@ -197,6 +197,7 @@ async function cancelAssignment(req, res) {
     res.status(500).json({ message: 'Server error' });
   }
 }
+
 
 // ─────────────────────────────────────────────────────────────
 // 3) Ολοκλήρωση ΔΕ ("Περατωμένη") από ΥΠΟ ΕΞΕΤΑΣΗ

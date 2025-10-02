@@ -108,6 +108,7 @@ async function loadTopics(){
       $('t_desc').value  = r.description || '';
       if(pond) pond.removeFiles(); else $('t_pdf').value = '';
       $('topicFormHint').textContent = `Λειτουργία: Επεξεργασία (#${r.id})`;
+      location.hash = '#topics'
     });
     act.appendChild(editBtn);
 
@@ -232,7 +233,7 @@ $('assignBtn')?.addEventListener('click', async (e)=>{
     $('a_topic').value=''; $('a_student').value='';
     if (typeof loadAssignments==='function') await loadAssignments();
   } catch (err) {
-    alert('❌ ' + (err.message || 'Σφάλμα'));
+    alert('' + (err.message || 'Σφάλμα'));
   } finally {
     setLoading(btn, false);
   }
@@ -266,6 +267,7 @@ $('btn-cancel-assignment')?.addEventListener('click', async (e)=>{
     setLoading(btn, false);
   }
 });
+
 
 // ================== Invitations ==================
 async function loadInvitations(){
