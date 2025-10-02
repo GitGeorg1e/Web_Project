@@ -170,13 +170,13 @@ if (profileForm) {
       const data = isJson ? await r.json() : null;
 
       if (!r.ok) {
-        msg.textContent = `❌ Error ${r.status}: ${data?.message || r.statusText}`;
+        msg.textContent = ` Error ${r.status}: ${data?.message || r.statusText}`;
         return;
       }
-      msg.textContent = data?.ok ? '✅ Αποθηκεύτηκε!' : `❌ Απέτυχε: ${data?.message || 'Άγνωστο σφάλμα'}`;
+      msg.textContent = data?.ok ? ' Αποθηκεύτηκε!' : ` Απέτυχε: ${data?.message || 'Άγνωστο σφάλμα'}`;
     } catch (err) {
       console.error(err);
-      document.getElementById('profile-msg').textContent = '❌ Σφάλμα δικτύου (fetch failed)';
+      document.getElementById('profile-msg').textContent = ' Σφάλμα δικτύου (fetch failed)';
     }
   });
 }

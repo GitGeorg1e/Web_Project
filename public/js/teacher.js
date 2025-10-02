@@ -3,6 +3,7 @@ function $(id){ return document.getElementById(id); }
 function td(text){ const x=document.createElement('td'); x.textContent=text; return x; }
 function clear(node){ while(node && node.firstChild) node.removeChild(node.firstChild); }
 function esc(s){ return String(s ?? ''); }
+let statsChart = null;
 
 function makeBtn(label, variant='primary'){
   const b=document.createElement('button');
@@ -227,7 +228,7 @@ $('assignBtn')?.addEventListener('click', async (e)=>{
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data?.message || r.statusText);
-    alert('✅ Η ανάθεση δημιουργήθηκε (#'+data.id+')');
+    alert(' Η ανάθεση δημιουργήθηκε (#'+data.id+')');
     $('a_topic').value=''; $('a_student').value='';
     if (typeof loadAssignments==='function') await loadAssignments();
   } catch (err) {
@@ -257,10 +258,10 @@ $('btn-cancel-assignment')?.addEventListener('click', async (e)=>{
     });
     const data = await r.json().catch(()=> ({}));
     if(!r.ok) throw new Error(data.message || r.statusText);
-    msg.textContent = '✅ Ακυρώθηκε.';
+    msg.textContent = ' Ακυρώθηκε.';
     await loadAssignments();
   }catch(e){
-    msg.textContent = `❌ ${e.message || 'Σφάλμα'}`;
+    msg.textContent = ` ${e.message || 'Σφάλμα'}`;
   }finally{
     setLoading(btn, false);
   }
@@ -327,66 +328,83 @@ async function loadInvitations(){
 // ================== Stats & Export ==================
 async function loadStats(){
   const s = await api('/api/teacher/stats');
-  new Chart($('statsChart'), {
-    type:'bar',
-    data:{
-      labels:['Πλήθος','Μ.Ο. Ημέρες','Μ.Ο. Βαθμός'],
-      datasets:[{ label:'Στατιστικά', data:[s.total_supervised, s.avg_days_open, s.avg_grade] }]
+
+  // αν το tab είναι κρυφό, περίμενε το next frame ώστε να έχει πλάτος ο καμβάς
+  const section = document.getElementById('stats');
+  if (section && section.classList.contains('tab') && !section.classList.contains('active')) {
+    await new Promise(requestAnimationFrame);
+  }
+
+  const ctx = document.getElementById('statsChart').getContext('2d');
+  if (statsChart) statsChart.destroy();
+
+  statsChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Πλήθος','Μ.Ο. Ημέρες','Μ.Ο. Βαθμός'],
+      datasets: [{ label:'Στατιστικά', data:[s.total_supervised, s.avg_days_open, s.avg_grade] }]
     },
-    options:{ responsive:true, plugins:{ legend:{ display:false } } }
+    options: { responsive:true, animation:false, plugins:{ legend:{ display:false } } }
   });
 }
+
 
 $('exportJson')?.addEventListener('click', e=>{ e.preventDefault(); window.open('/api/teacher/theses/export?format=json','_blank'); });
 $('exportCsv') ?.addEventListener('click', e=>{ e.preventDefault(); window.open('/api/teacher/theses/export?format=csv','_blank'); });
 
 /* ================== Tabs (show/hide + lazy load) ================== */
 const loadedTabs = {};
-function showTab(hash){
+
+async function showTab(hash){
   const links = Array.from(document.querySelectorAll('nav.card a[href^="#"]'));
   const valid = new Set(links.map(a=>a.getAttribute('href')));
   const target = valid.has(hash) ? hash : '#topics';
 
-  // toggle active link
   links.forEach(a => a.classList.toggle('active', a.getAttribute('href')===target));
 
-  // toggle sections
   const sections = Array.from(document.querySelectorAll('main .card[id]'));
   sections.forEach(sec => sec.classList.toggle('active', '#'+sec.id === target));
 
-  // lazy load per tab (once)
   const name = target.slice(1);
-  if (loadedTabs[name]) return;
+
+  // για τα περισσότερα tabs φόρτωσε μόνο μία φορά,
+  // αλλά για 'stats' (και προαιρετικά 'theses') φόρτωνε κάθε φορά
+  const singleRun = !['stats'].includes(name);
+  if (singleRun && loadedTabs[name]) return;
+
   const loaders = {
-    topics:       ()=> loadTopics(),
-    'my-topics':  ()=> loadTopics(),
-    assign:       ()=> {/* μόνο φόρμες */},
-    assignments:  ()=> loadAssignments(),
-    invitations:  ()=> loadInvitations(),
-    stats:        ()=> loadStats(),
-    theses:       ()=> {
-      // Δώσε σήμα στο teacher-theses.js να φορτώσει/εφαρμόσει φίλτρα
-      if (window.teacherTheses && typeof window.teacherTheses.open==='function') window.teacherTheses.open();
-      else if (typeof window.applyThesesFilters==='function') window.applyThesesFilters();
+    topics:       () => loadTopics(),
+    'my-topics':  () => loadTopics(),
+    assign:       () => {},
+    assignments:  () => loadAssignments(),
+    invitations:  () => loadInvitations(),
+    stats:        () => loadStats(), // θα τρέχει σε κάθε άνοιγμα
+    theses:       () => {
+      if (window.teacherTheses?.open) window.teacherTheses.open();
+      else if (typeof window.applyThesesFilters === 'function') window.applyThesesFilters();
       else window.dispatchEvent(new CustomEvent('theses:open'));
     },
-    'manage-assignment': ()=> {/* χειροκίνητα κουμπιά */}
+    'manage-assignment': () => {}
   };
-  if (loaders[name]) {
-    loaders[name]();
-    loadedTabs[name] = true;
+
+  if (!loaders[name]) return;
+
+  try {
+    await Promise.resolve(loaders[name]());
+    if (singleRun) loadedTabs[name] = true;
+  } catch (err) {
+    console.error('[tab loader]', name, err);
+    // μην το κλειδώσεις, ώστε να ξαναδοκιμάσει στο επόμενο άνοιγμα
   }
 }
 
-// ================== bootstrap ==================
-document.addEventListener('DOMContentLoaded', async ()=>{
-  try{
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
     initFilePond();
     await loadMe();
-    // αρχική καρτέλα (default: #topics)
-    showTab(location.hash || '#topics');
-    window.addEventListener('hashchange', ()=> showTab(location.hash));
-  }catch(e){
-    if(String(e.message).toLowerCase().includes('unauthorized')) location.href='/';
+    await showTab(location.hash || '#topics');
+    window.addEventListener('hashchange', () => showTab(location.hash));
+  } catch (e) {
+    if (String(e.message).toLowerCase().includes('unauthorized')) location.href='/';
   }
 });

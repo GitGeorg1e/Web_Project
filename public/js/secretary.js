@@ -59,7 +59,7 @@ async function loadList() {
     });
     ul.dataset.loaded = '1';
   } catch (e) {
-    ul.innerHTML = `❌ Σφάλμα: ${e.message || 'Server error'}`;
+    ul.innerHTML = ` Σφάλμα: ${e.message || 'Server error'}`;
   }
 }
 
@@ -89,7 +89,7 @@ async function loadDetails(id) {
       </p>
     `;
   } catch (e) {
-    box.innerHTML = `❌ Σφάλμα: ${e.message || 'Server error'}`;
+    box.innerHTML = ` Σφάλμα: ${e.message || 'Server error'}`;
   }
 }
 
@@ -119,12 +119,12 @@ document.getElementById('btn-import')?.addEventListener('click', async () => {
     const data = isJson ? await res.json() : null;
 
     if (!res.ok) {
-      msg.textContent = `❌ Error ${res.status}: ${data?.message || res.statusText}`;
+      msg.textContent = ` Error ${res.status}: ${data?.message || res.statusText}`;
       return;
     }
 
-    msg.innerHTML = `✅ ΟΚ — Inserted: ${data.inserted}, Updated: ${data.updated}${
-      data.errors?.length ? '<br>⚠️ Σφάλματα: ' + data.errors.length : ''
+    msg.innerHTML = ` ΟΚ — Inserted: ${data.inserted}, Updated: ${data.updated}${
+      data.errors?.length ? '<br> Σφάλματα: ' + data.errors.length : ''
     }`;
 
     if (data.errors?.length) console.warn('Import errors:', data.errors);
@@ -134,7 +134,7 @@ document.getElementById('btn-import')?.addEventListener('click', async () => {
     if (location.hash === '#tab-list') loadList();
   } catch (e) {
     console.error(e);
-    msg.textContent = '❌ Σφάλμα δικτύου';
+    msg.textContent = ' Σφάλμα δικτύου';
   }
 });
 
@@ -163,11 +163,11 @@ document.getElementById('btn-gs-approval')?.addEventListener('click', async () =
   if (!id || !number || !year) { actMsg.textContent='Συμπλήρωσε ID, αριθμό & έτος ΓΣ.'; return; }
   try {
     await postJson(`/api/secretariat/assignments/${id}/gs-approval`, { number, year });
-    actMsg.textContent = '✅ Καταχωρήθηκε ο ΑΠ ΓΣ.';
+    actMsg.textContent = ' Καταχωρήθηκε ο ΑΠ ΓΣ.';
     $('list')?.removeAttribute('data-loaded');
     if (location.hash === '#tab-list') loadList();
   } catch (e) {
-    actMsg.textContent = `❌ ${e.message || 'Σφάλμα'}`;
+    actMsg.textContent = ` ${e.message || 'Σφάλμα'}`;
   }
 });
 
@@ -181,11 +181,11 @@ document.getElementById('btn-cancel')?.addEventListener('click', async () => {
   if (!confirm('Σίγουρα ακύρωση ανάθεσης;')) return;
   try {
     await postJson(`/api/secretariat/assignments/${id}/cancel`, { gs_number, gs_year, reason });
-    actMsg.textContent = '✅ Η ανάθεση ακυρώθηκε.';
+    actMsg.textContent = ' Η ανάθεση ακυρώθηκε.';
     $('list')?.removeAttribute('data-loaded');
     if (location.hash === '#tab-list') loadList();
   } catch (e) {
-    actMsg.textContent = `❌ ${e.message || 'Σφάλμα'}`;
+    actMsg.textContent = ` ${e.message || 'Σφάλμα'}`;
   }
 });
 
@@ -195,11 +195,11 @@ document.getElementById('btn-complete')?.addEventListener('click', async () => {
   if (!id) { actMsg.textContent='Δώσε ID ΔΕ.'; return; }
   try {
     await postJson(`/api/secretariat/assignments/${id}/complete`, {});
-    actMsg.textContent = '✅ Η ΔΕ έγινε Περατωμένη.';
+    actMsg.textContent = ' Η ΔΕ έγινε Περατωμένη.';
     $('list')?.removeAttribute('data-loaded');
     if (location.hash === '#tab-list') loadList();
   } catch (e) {
-    actMsg.textContent = `❌ ${e.message || 'Σφάλμα'}`;
+    actMsg.textContent = ` ${e.message || 'Σφάλμα'}`;
   }
 });
 

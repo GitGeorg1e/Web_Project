@@ -47,7 +47,7 @@
       // Ο server συνήθως επιστρέφει { redirect: '/teacher.html' } κλπ.
       location.href = data.redirect || '/';
     } catch (err) {
-      showMsg(`❌ ${err.message}`, true);
+      showMsg(` ${err.message}`, true);
     } finally {
       setLoading(false);
     }

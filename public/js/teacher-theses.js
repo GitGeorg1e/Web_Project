@@ -172,7 +172,7 @@
 
       detailsHost.replaceChildren(card2);
     } catch (e) {
-      const err = el('div', { class: 'card' }, el('div', { text: `❌ Σφάλμα: ${e.message || 'Unknown'}` }));
+      const err = el('div', { class: 'card' }, el('div', { text: ` Σφάλμα: ${e.message || 'Unknown'}` }));
       detailsHost.replaceChildren(err);
     }
   }

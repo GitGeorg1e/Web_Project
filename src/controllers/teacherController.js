@@ -683,7 +683,7 @@ async function submitGrade(req,res){
   try{
     const teacherId=req.session.user.id;
     const id=Number(req.params.id);
-    const { total, criteria } = req.body||{};
+    const { total, criteria_json } = req.body||{};
     const asg=await assertParticipant(teacherId,id);
     if (asg.status!=='under_review') return res.status(400).json({message:'Grading only in under_review'});
     const [[{grading_enabled}]] = await pool.query('SELECT grading_enabled FROM assignments WHERE id=?',[id]);
@@ -691,10 +691,10 @@ async function submitGrade(req,res){
     if (total==null) return res.status(400).json({message:'total required'});
 
     await pool.query(`
-      INSERT INTO grades (assignment_id, grader_id, total, created_at, criteria)
+      INSERT INTO grades (assignment_id, grader_id, total, created_at, criteria_json)
       VALUES (?, ?, ?, NOW(), ?)
-      ON DUPLICATE KEY UPDATE total=VALUES(total), criteria=VALUES(criteria), created_at=NOW()
-    `,[id,teacherId,Number(total), criteria?JSON.stringify(criteria):null]);
+      ON DUPLICATE KEY UPDATE total=VALUES(total), criteria_json=VALUES(criteria_json), created_at=NOW()
+    `,[id,teacherId,Number(total), criteria_json?JSON.stringify(criteria_json):null]);
 
     res.status(201).json({ok:true});
   }catch(e){ res.status(e.status||500).json({message:e.message||'Server error'}); }
@@ -706,7 +706,7 @@ async function listGrades(req,res){
     const id=Number(req.params.id);
     await assertParticipant(teacherId,id);
     const [rows]=await pool.query(`
-      SELECT g.grader_id, u.full_name AS grader_name, g.total, g.created_at, g.criteria
+      SELECT g.grader_id, u.full_name AS grader_name, g.total, g.created_at, g.criteria_json
       FROM grades g JOIN users u ON u.id=g.grader_id
       WHERE g.assignment_id=?`,[id]);
 
@@ -715,7 +715,7 @@ async function listGrades(req,res){
       grader_name:r.grader_name,
       total:Number(r.total),
       created_at:r.created_at,
-      criteria:r.criteria?JSON.parse(r.criteria):null
+      criteria_json:r.criteria_json?JSON.parse(r.criteria_json):null
     })));
   }catch(e){ res.status(e.status||500).json({message:e.message||'Server error'}); }
 }
